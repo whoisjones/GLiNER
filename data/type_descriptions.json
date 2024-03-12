@@ -1,0 +1,88 @@
+{"dataset_name": "conll2003", "label_column": "ner_tags", "original_label": "PER", "verbalized_label": "person"}
+{"dataset_name": "conll2003", "label_column": "ner_tags", "original_label": "LOC", "verbalized_label": "location"}
+{"dataset_name": "conll2003", "label_column": "ner_tags", "original_label": "ORG", "verbalized_label": "organization"}
+{"dataset_name": "conll2003", "label_column": "ner_tags", "original_label": "MISC", "verbalized_label": "miscellaneous"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "PERSON", "verbalized_label": "person"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "GPE", "verbalized_label": "geopolitical entity"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "ORG", "verbalized_label": "organization"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "FAC", "verbalized_label": "facility"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "LOC", "verbalized_label": "location"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "NORP", "verbalized_label": "nationaltiy or religious or political group"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "WORK_OF_ART", "verbalized_label": "work of art"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "LAW", "verbalized_label": "law"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "LANGUAGE", "verbalized_label": "language"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "DATE", "verbalized_label": "date"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "TIME", "verbalized_label": "time"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "PERCENT", "verbalized_label": "percent"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "MONEY", "verbalized_label": "money"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "QUANTITY", "verbalized_label": "quantity"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "ORDINAL", "verbalized_label": "ordinal"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "CARDINAL", "verbalized_label": "cardinal"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "EVENT", "verbalized_label": "event"}
+{"dataset_name": "conll2012_ontonotesv5", "label_column": "ner_tags", "original_label": "PRODUCT", "verbalized_label": "product"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "art-broadcastprogram", "verbalized_label": "art - broadcast program"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "art-film", "verbalized_label": "art - film"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "art-music", "verbalized_label": "art - music"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "art-other", "verbalized_label": "other art entities"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "art-painting", "verbalized_label": "art - painting"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "art-writtenart", "verbalized_label": "art - written art"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-airport", "verbalized_label": "building - airport"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-hospital", "verbalized_label": "building - hospital"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-hotel", "verbalized_label": "building - hotel"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-library", "verbalized_label": "building - library"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-other", "verbalized_label": "other building entities"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-restaurant", "verbalized_label": "building - restaurant"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-sportsfacility", "verbalized_label": "building - sports facility"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "building-theater", "verbalized_label": "building - theater"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "event-attack/battle/war/militaryconflict", "verbalized_label": "event - attack, battle, war or military conflict"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "event-disaster", "verbalized_label": "event - disaster"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "event-election", "verbalized_label": "event - election"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "event-protest", "verbalized_label": "event - protest"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "event-other", "verbalized_label": "other event entities"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "event-sportsevent", "verbalized_label": "event - sports event"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "location-GPE", "verbalized_label": "location - geopolitical entity"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "location-bodiesofwater", "verbalized_label": "location - bodies of water"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "location-island", "verbalized_label": "location - island"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "location-mountain", "verbalized_label": "location - mountain"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "location-other", "verbalized_label": "other location entities"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "location-park", "verbalized_label": "location - park"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "location-road/railway/highway/transit", "verbalized_label": "location - road, railway, highway or transit"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-company", "verbalized_label": "organization - company"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-education", "verbalized_label": "organization - educational institution"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-government/governmentagency", "verbalized_label": "organization - government"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-media/newspaper", "verbalized_label": "organization - media or newspaper"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-other", "verbalized_label": "other organization entities"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-politicalparty", "verbalized_label": "organization - political party"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-religion", "verbalized_label": "organization - religion"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-showorganization", "verbalized_label": "organization - show organization"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-sportsleague", "verbalized_label": "organization - sports league"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "organization-sportsteam", "verbalized_label": "organization - sports team"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-astronomything", "verbalized_label": "astronomy entity"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-award", "verbalized_label": "award"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-biologything", "verbalized_label": "biological entity"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-chemicalthing", "verbalized_label": "chemical entity"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-currency", "verbalized_label": "currency"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-disease", "verbalized_label": "disease"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-educationaldegree", "verbalized_label": "educational degree"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-god", "verbalized_label": "god"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-language", "verbalized_label": "language"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-law", "verbalized_label": "law entity"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-livingthing", "verbalized_label": "other living entity"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "other-medical", "verbalized_label": "medical entity"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-actor", "verbalized_label": "person - actor"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-artist/author", "verbalized_label": "person - artist or author"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-athlete", "verbalized_label": "person - athlete"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-director", "verbalized_label": "person - director"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-other", "verbalized_label": "other person entities"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-politician", "verbalized_label": "person - politician"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-scholar", "verbalized_label": "person - scholar"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "person-soldier", "verbalized_label": "person - soldier"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-airplane", "verbalized_label": "product - airplane"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-car", "verbalized_label": "product - car"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-food", "verbalized_label": "product - food"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-game", "verbalized_label": "product - game"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-other", "verbalized_label": "other product entities"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-ship", "verbalized_label": "product - ship"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-software", "verbalized_label": "product - software"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-train", "verbalized_label": "product - train"}
+{"dataset_name": "DFKI-SLT/few-nerd", "label_column": "fine_ner_tags", "original_label": "product-weapon", "verbalized_label": "product - weapon"}
