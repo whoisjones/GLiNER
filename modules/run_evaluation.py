@@ -28,11 +28,11 @@ def open_content(path):
 
 
 def process(data):
-    words = data['sentence'].split()
+    words = data["sentence"].split()
     entities = []  # List of entities (start, end, type)
 
-    for entity in data['entities']:
-        start_char, end_char = entity['pos']
+    for entity in data["entities"]:
+        start_char, end_char = entity["pos"]
 
         # Initialize variables to keep track of word positions
         start_word = None
@@ -50,13 +50,10 @@ def process(data):
             char_count += word_length + 1  # Add 1 for the space
 
         # Append the word positions to the list
-        entities.append((start_word, end_word, entity['type']))
+        entities.append((start_word, end_word, entity["type"]))
 
     # Create a list of word positions for each entity
-    sample = {
-        "tokenized_text": words,
-        "ner": entities
-    }
+    sample = {"tokenized_text": words, "ner": entities}
 
     return sample
 
@@ -89,12 +86,17 @@ def get_for_one_path(path, model):
         flat_ner = False
 
     # evaluate the model
-    results, f1 = model.evaluate(test_dataset, flat_ner=flat_ner, threshold=0.5, batch_size=12,
-                                 entity_types=entity_types)
+    results, f1 = model.evaluate(
+        test_dataset,
+        flat_ner=flat_ner,
+        threshold=0.5,
+        batch_size=12,
+        entity_types=entity_types,
+    )
     return data_name, results, f1
 
 
-def get_for_all_path(model, steps, log_dir, data_paths):
+def get_for_all_path(model, steps, log_dir, data_paths, only_zero_shot=True):
     all_paths = glob.glob(f"{data_paths}/*")
 
     all_paths = sorted(all_paths)
@@ -113,14 +115,22 @@ def get_for_all_path(model, steps, log_dir, data_paths):
         # write step
         f.write("step: " + str(steps) + "\n")
 
-    zero_shot_benc = ["mit-movie", "mit-restaurant", "CrossNER_AI", "CrossNER_literature", "CrossNER_music",
-                      "CrossNER_politics", "CrossNER_science"]
+    zero_shot_benc = [
+        "mit-movie",
+        "mit-restaurant",
+        "CrossNER_AI",
+        "CrossNER_literature",
+        "CrossNER_music",
+        "CrossNER_politics",
+        "CrossNER_science",
+    ]
 
     zero_shot_benc_results = {}
-    all_results = {}  # without crossNER
+    if only_zero_shot:
+        all_results = {}  # without crossNER
 
     for p in tqdm(all_paths):
-        if "sample_" not in p:
+        if "sample_" not in p and any([i in p for i in zero_shot_benc]):
             data_name, results, f1 = get_for_one_path(p, model)
             # write to file
             with open(save_path, "a") as f:
@@ -130,19 +140,22 @@ def get_for_all_path(model, steps, log_dir, data_paths):
             if data_name in zero_shot_benc:
                 zero_shot_benc_results[data_name] = f1
             else:
-                all_results[data_name] = f1
+                if not only_zero_shot:
+                    all_results[data_name] = f1
 
-    avg_all = sum(all_results.values()) / len(all_results)
+    if not only_zero_shot:
+        avg_all = sum(all_results.values()) / len(all_results)
     avg_zs = sum(zero_shot_benc_results.values()) / len(zero_shot_benc_results)
 
     save_path_table = os.path.join(log_dir, "tables.txt")
 
-    # results for all datasets except crossNER
-    table_bench_all = ""
-    for k, v in all_results.items():
-        table_bench_all += f"{k:20}: {v:.1%}\n"
-    # (20 size aswell for average i.e. :20)
-    table_bench_all += f"{'Average':20}: {avg_all:.1%}"
+    if not only_zero_shot:
+        # results for all datasets except crossNER
+        table_bench_all = ""
+        for k, v in all_results.items():
+            table_bench_all += f"{k:20}: {v:.1%}\n"
+        # (20 size aswell for average i.e. :20)
+        table_bench_all += f"{'Average':20}: {avg_all:.1%}"
 
     # results for zero-shot benchmark
     table_bench_zeroshot = ""
@@ -154,8 +167,12 @@ def get_for_all_path(model, steps, log_dir, data_paths):
     with open(save_path_table, "a") as f:
         f.write("##############################################\n")
         f.write("step: " + str(steps) + "\n")
-        f.write("Table for all datasets except crossNER\n")
-        f.write(table_bench_all + "\n\n")
+        (
+            f.write("Table for all datasets except crossNER\n")
+            if not only_zero_shot
+            else None
+        )
+        f.write(table_bench_all + "\n\n") if not only_zero_shot else None
         f.write("Table for zero-shot benchmark\n")
         f.write(table_bench_zeroshot + "\n")
         f.write("##############################################\n\n")
@@ -167,8 +184,14 @@ def sample_train_data(data_paths, sample_size=10000):
     all_paths = sorted(all_paths)
 
     # to exclude the zero-shot benchmark datasets
-    zero_shot_benc = ["CrossNER_AI", "CrossNER_literature", "CrossNER_music",
-                      "CrossNER_politics", "CrossNER_science", "ACE 2004"]
+    zero_shot_benc = [
+        "CrossNER_AI",
+        "CrossNER_literature",
+        "CrossNER_music",
+        "CrossNER_politics",
+        "CrossNER_science",
+        "ACE 2004",
+    ]
 
     new_train = []
     # take 10k samples from each dataset
