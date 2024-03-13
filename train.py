@@ -29,10 +29,15 @@ def train(
 ):
     model.train()
 
-    # initialize data loaders
-    train_loader = model.create_dataloader(
-        train_data, batch_size=train_batch_size, shuffle=True
-    )
+    if "litset" in log_dir:
+        train_loader = model.create_litset_dataloader(
+            train_data, batch_size=train_batch_size, shuffle=True
+        )
+    else:
+        # initialize data loaders
+        train_loader = model.create_dataloader(
+            train_data, batch_size=train_batch_size, shuffle=True
+        )
 
     pbar = tqdm(range(num_steps))
 
@@ -125,8 +130,16 @@ if __name__ == "__main__":
         os.makedirs(config.log_dir)
 
     try:
-        with open(os.path.join(config.root_dir, config.train_data), "r") as f:
-            data = json.load(f)
+        if "litset" in config.train_data:
+            with open(
+                os.path.join(config.root_dir, "train_datasets/litset.jsonl"), "r"
+            ) as f:
+                data = []
+                for line in f.readlines():
+                    data.append(json.loads(line))
+        else:
+            with open(os.path.join(config.root_dir, config.train_data), "r") as f:
+                data = json.load(f)
     except:
         data = sample_train_data(config.train_data, 10000)
 
