@@ -1,61 +1,17 @@
 import json
-from typing import Dict
+from typing import Union, Dict
 from tqdm import tqdm
 
 import datasets
 from datasets import load_dataset
 
 
-def flatten(examples: Dict) -> Dict:
-    """Flattens the OntoNotes dataset."""
-    sentences = [sentence for doc in examples["sentences"] for sentence in doc]
-    examples["tokens"] = [sentence["words"] for sentence in sentences]
-    examples["ner_tags"] = [sentence["named_entities"] for sentence in sentences]
-    return examples
-
-
-def to_io_format(ontonotes: datasets.Dataset, labels: str) -> datasets.Dataset:
-    """Converts the OntoNotes dataset to IO format."""
-    id2biolabel = {idx: label for idx, label in enumerate(labels)}
-    id2iolabel = {}
-    label_mapping = {}
-    for idx, label in id2biolabel.items():
-        if label == "O":
-            id2iolabel[len(id2iolabel)] = label
-            label_mapping[idx] = len(id2iolabel) - 1
-        elif label.startswith("B-") or label.startswith("I-"):
-            io_label = label[2:]
-            if io_label not in id2iolabel.values():
-                io_label_id = len(id2iolabel)
-                id2iolabel[io_label_id] = io_label
-                label_mapping[idx] = io_label_id
-            else:
-                label_mapping[idx] = [
-                    k for k, v in id2iolabel.items() if v == io_label
-                ][0]
-
-    def io_format(examples):
-        examples["ner_tags"] = [
-            [label_mapping.get(old_id) for old_id in sample]
-            for sample in examples["ner_tags"]
-        ]
-        return examples
-
-    ontonotes = ontonotes.map(io_format, batched=True, desc="Convert to IO format.")
-    ontonotes = ontonotes.cast_column(
-        "ner_tags",
-        datasets.Sequence(datasets.ClassLabel(names=list(id2iolabel.values()))),
-    )
-
-    return ontonotes
-
-
 def verbalize_labels(
-    ontonotes: datasets.Dataset,
+    dataset: datasets.Dataset,
     dataset_name: str,
     label_column: str,
 ) -> datasets.Dataset:
-    """Verbalizes the labels in the OntoNotes dataset."""
+    """Verbalizes the labels in the dataset."""
     type_verbalizations = load_dataset(
         "json", data_files="data/type_descriptions.json", split="train"
     )
@@ -65,7 +21,7 @@ def verbalize_labels(
         and (example["label_column"] == label_column)
     )
     # Extract current labels
-    labels = ontonotes.features[label_column].feature.names
+    labels = dataset.features[label_column].feature.names
 
     # If current labels are in BIO format we need to add the verbalizations in BIO format as well
     if any([label.startswith("B-") or label.startswith("I-") for label in labels]):
@@ -87,19 +43,19 @@ def verbalize_labels(
         idx = labels.index(type_verbalization["original_label"])
         labels[idx] = type_verbalization["verbalized_label"]
 
-    ontonotes = ontonotes.cast_column(
+    dataset = dataset.cast_column(
         label_column,
         datasets.Sequence(datasets.ClassLabel(names=labels)),
     )
 
-    return ontonotes
+    return dataset
 
 
-def format_ontonotes(ontonotes: datasets.Dataset) -> datasets.Dataset:
+def format_dataset(dataset: datasets.Dataset, label_column: str) -> datasets.Dataset:
     """Formats the OntoNotes dataset to a list of dictionaries with tokenized text and named entity spans."""
-    id2label = dict(enumerate(ontonotes.features["ner_tags"].feature.names))
-    formatted_ontonotes = []
-    for i, example in enumerate(tqdm(ontonotes)):
+    id2label = dict(enumerate(dataset.features[label_column].feature.names))
+    formatted_dataset = []
+    for i, example in enumerate(tqdm(dataset)):
         data_point = {"tokenized_text": example["tokens"]}
 
         type_id = None
@@ -107,7 +63,7 @@ def format_ontonotes(ontonotes: datasets.Dataset) -> datasets.Dataset:
         end = None
 
         current_spans = []
-        for word_id, tag in enumerate(example["ner_tags"]):
+        for word_id, tag in enumerate(example[label_column]):
             # Skip any token that is not part of an entity.
             if tag == 0:
                 # If we have a start, a non-entity will end the current entity.
@@ -137,28 +93,20 @@ def format_ontonotes(ontonotes: datasets.Dataset) -> datasets.Dataset:
             current_spans.append([start, end, id2label.get(type_id)])
 
         data_point["ner"] = current_spans
-        formatted_ontonotes.append(data_point)
-    return formatted_ontonotes
+        formatted_dataset.append(data_point)
+    return formatted_dataset
 
 
 if __name__ == "__main__":
-    dataset_name = "conll2012_ontonotesv5"
-    dataset_config = "english_v4"
-    label_column = "ner_tags"
+    dataset_name = "DFKI-SLT/few-nerd"
+    dataset_config = "supervised"
+    label_column = "fine_ner_tags"
 
-    ontonotes = load_dataset(dataset_name, dataset_config, split="train")
-    labels = ontonotes.features["sentences"][0]["named_entities"].feature.names
+    fewnerd = load_dataset(dataset_name, dataset_config, split="train")
+    labels = fewnerd.features[label_column].feature.names
 
-    ontonotes = ontonotes.map(
-        flatten,
-        batched=True,
-        remove_columns=ontonotes.column_names,
-        desc="Flatten OntoNotes.",
-    )
+    fewnerd = verbalize_labels(fewnerd, dataset_name, label_column)
+    formatted_fewnerd = format_dataset(fewnerd, label_column)
 
-    ontonotes = to_io_format(ontonotes, labels)
-    ontonotes = verbalize_labels(ontonotes, dataset_name, label_column)
-    formatted_ontonotes = format_ontonotes(ontonotes)
-
-    with open("ontonotes.json", "w") as f:
-        json.dump(formatted_ontonotes, f)
+    with open("fewnerd.json", "w") as f:
+        json.dump(formatted_fewnerd, f)

@@ -125,9 +125,8 @@ if __name__ == "__main__":
         os.makedirs(config.log_dir)
 
     try:
-        if "pilener" in config.train_data:
-            with open(os.path.join(config.root_dir, config.train_data), "r") as f:
-                data = json.load(f)
+        with open(os.path.join(config.root_dir, config.train_data), "r") as f:
+            data = json.load(f)
     except:
         data = sample_train_data(config.train_data, 10000)
 
