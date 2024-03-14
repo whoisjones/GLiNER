@@ -137,6 +137,9 @@ if __name__ == "__main__":
                 data = []
                 for line in f.readlines():
                     data.append(json.loads(line))
+                data = [
+                    x for x in data if x["ner"]
+                ]  # Comment this out if you want to use the entire dataset
         else:
             with open(os.path.join(config.root_dir, config.train_data), "r") as f:
                 data = json.load(f)
