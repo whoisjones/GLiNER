@@ -1,17 +1,19 @@
-import argparse
 import os
+import json
+import yaml
+import random
 import datetime
+import argparse
+from tqdm import tqdm
 
 import torch
-import yaml
-from tqdm import tqdm
+import numpy as np
 from transformers import get_cosine_schedule_with_warmup
 
 # from model_nested import NerFilteredSemiCRF
 from model import GLiNER
 from modules.run_evaluation import get_for_all_path, sample_train_data
 from save_load import save_model, load_model
-import json
 
 
 # train function
@@ -109,6 +111,12 @@ def load_config_as_namespace(config_file):
 
 
 if __name__ == "__main__":
+    # set seeds
+    random.seed(123)
+    np.random.seed(123)
+    torch.manual_seed(123)
+    torch.cuda.manual_seed_all(123)
+
     # parse args
     parser = create_parser()
     args = parser.parse_args()
@@ -161,16 +169,7 @@ if __name__ == "__main__":
     lr_encoder = float(config.lr_encoder)
     lr_others = float(config.lr_others)
 
-    optimizer = torch.optim.AdamW(
-        [
-            # encoder
-            {"params": model.token_rep_layer.parameters(), "lr": lr_encoder},
-            {"params": model.rnn.parameters(), "lr": lr_others},
-            # projection layers
-            {"params": model.span_rep_layer.parameters(), "lr": lr_others},
-            {"params": model.prompt_rep_layer.parameters(), "lr": lr_others},
-        ]
-    )
+    optimizer = model.get_optimizer(lr_encoder, lr_others, config.freeze_token_rep)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
