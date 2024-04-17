@@ -40,12 +40,48 @@ def flatten_for_eval(y_true, y_pred):
     return all_true, all_pred
 
 
-def compute_prf(y_true, y_pred, average='micro'):
+def compute_prf(y_true, y_pred, average="micro"):
     y_true, y_pred = flatten_for_eval(y_true, y_pred)
 
     pred_sum, tp_sum, true_sum, target_names = extract_tp_actual_correct(y_true, y_pred)
 
-    if average == 'micro':
+    results = {}
+    for idx, label in enumerate(target_names):
+        tp = np.array([tp_sum[idx]])
+        pred = np.array([pred_sum[idx]])
+        true = np.array([true_sum[idx]])
+
+        precision = _prf_divide(
+            numerator=tp,
+            denominator=pred,
+            metric="precision",
+            modifier="predicted",
+            average=average,
+            warn_for=("precision", "recall", "f-score"),
+            zero_division="warn",
+        )
+
+        recall = _prf_divide(
+            numerator=tp,
+            denominator=true,
+            metric="recall",
+            modifier="true",
+            average=average,
+            warn_for=("precision", "recall", "f-score"),
+            zero_division="warn",
+        )
+
+        denominator = precision + recall
+        denominator[denominator == 0.0] = 1
+        f_score = 2 * (precision * recall) / denominator
+
+        results[label] = {
+            "precision": precision[0],
+            "recall": recall[0],
+            "f1": f_score[0],
+        }
+
+    if average == "micro":
         tp_sum = np.array([tp_sum.sum()])
         pred_sum = np.array([pred_sum.sum()])
         true_sum = np.array([true_sum.sum()])
@@ -53,28 +89,34 @@ def compute_prf(y_true, y_pred, average='micro'):
     precision = _prf_divide(
         numerator=tp_sum,
         denominator=pred_sum,
-        metric='precision',
-        modifier='predicted',
+        metric="precision",
+        modifier="predicted",
         average=average,
-        warn_for=('precision', 'recall', 'f-score'),
-        zero_division='warn'
+        warn_for=("precision", "recall", "f-score"),
+        zero_division="warn",
     )
 
     recall = _prf_divide(
         numerator=tp_sum,
         denominator=true_sum,
-        metric='recall',
-        modifier='true',
+        metric="recall",
+        modifier="true",
         average=average,
-        warn_for=('precision', 'recall', 'f-score'),
-        zero_division='warn'
+        warn_for=("precision", "recall", "f-score"),
+        zero_division="warn",
     )
 
     denominator = precision + recall
-    denominator[denominator == 0.] = 1
+    denominator[denominator == 0.0] = 1
     f_score = 2 * (precision * recall) / denominator
 
-    return {'precision': precision[0], 'recall': recall[0], 'f_score': f_score[0]}
+    results["overall"] = {
+        "precision": precision[0],
+        "recall": recall[0],
+        "f1": f_score[0],
+    }
+
+    return results
 
 
 class Evaluator:
@@ -101,21 +143,22 @@ class Evaluator:
     @torch.no_grad()
     def evaluate(self):
         all_true_typed, all_outs_typed = self.transform_data()
-        precision, recall, f1 = compute_prf(all_true_typed, all_outs_typed).values()
-        output_str = f"P: {precision:.2%}\tR: {recall:.2%}\tF1: {f1:.2%}\n"
-        return output_str, f1
+        results = compute_prf(all_true_typed, all_outs_typed)
+        return results
 
 
 def is_nested(idx1, idx2):
     # Return True if idx2 is nested inside idx1 or vice versa
-    return (idx1[0] <= idx2[0] and idx1[1] >= idx2[1]) or (idx2[0] <= idx1[0] and idx2[1] >= idx1[1])
+    return (idx1[0] <= idx2[0] and idx1[1] >= idx2[1]) or (
+        idx2[0] <= idx1[0] and idx2[1] >= idx1[1]
+    )
 
 
 def has_overlapping(idx1, idx2):
     overlapping = True
     if idx1[:2] == idx2[:2]:
         return overlapping
-    if (idx1[0] > idx2[1] or idx2[0] > idx1[1]):
+    if idx1[0] > idx2[1] or idx2[0] > idx1[1]:
         overlapping = False
     return overlapping
 
@@ -124,7 +167,9 @@ def has_overlapping_nested(idx1, idx2):
     # Return True if idx1 and idx2 overlap, but neither is nested inside the other
     if idx1[:2] == idx2[:2]:
         return True
-    if ((idx1[0] > idx2[1] or idx2[0] > idx1[1]) or is_nested(idx1, idx2)) and idx1 != idx2:
+    if (
+        (idx1[0] > idx2[1] or idx2[0] > idx1[1]) or is_nested(idx1, idx2)
+    ) and idx1 != idx2:
         return False
     else:
         return True
