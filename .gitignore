@@ -5,6 +5,9 @@
 # Images
 *.png
 
+# Text files
+*.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
