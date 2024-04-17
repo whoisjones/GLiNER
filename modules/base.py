@@ -46,7 +46,7 @@ class InstructBase(nn.Module):
         # mask for valid spans
         valid_span_mask = spans_idx[:, 1] > length - 1
 
-        if self.config.learn_only_positives:
+        if "learn_only_positives" in self.config and self.config.learn_only_positives:
             non_entity_mask = span_label == 0
             valid_span_mask = torch.logical_or(valid_span_mask, non_entity_mask)
 
