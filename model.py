@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 from typing import Dict, Optional, Union
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 from modules.layers import LstmSeq2SeqEncoder
@@ -347,7 +348,7 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         device = next(self.parameters()).device
         all_preds = []
         all_trues = []
-        for x in data_loader:
+        for x in tqdm(data_loader):
             for k, v in x.items():
                 if isinstance(v, torch.Tensor):
                     x[k] = v.to(device)
@@ -355,8 +356,8 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
             all_preds.extend(batch_predictions)
             all_trues.extend(x["entities"])
         evaluator = Evaluator(all_trues, all_preds)
-        out, f1 = evaluator.evaluate()
-        return out, f1
+        metrics = evaluator.evaluate()
+        return metrics
 
     @classmethod
     def _from_pretrained(
