@@ -21,7 +21,7 @@ dropout: 0.4
 # Directory Paths
 root_dir: /vol/tmp/goldejon/gliner
 log_dir: logs
-train_data: train_datasets/pilener_train.json
+train_data: train_datasets/ontonotes.json
 eval_data: eval_datasets/NER
 
 # "none" if no pretrained model 

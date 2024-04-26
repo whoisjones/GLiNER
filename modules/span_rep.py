@@ -2,7 +2,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-def create_projection_layer(hidden_size: int, dropout: float, out_dim: int = None) -> nn.Sequential:
+
+def create_projection_layer(
+    hidden_size: int, dropout: float, out_dim: int = None
+) -> nn.Sequential:
     """
     Creates a projection layer with specified configurations.
     """
@@ -13,7 +16,7 @@ def create_projection_layer(hidden_size: int, dropout: float, out_dim: int = Non
         nn.Linear(hidden_size, out_dim * 4),
         nn.ReLU(),
         nn.Dropout(dropout),
-        nn.Linear(out_dim * 4, out_dim)
+        nn.Linear(out_dim * 4, out_dim),
     )
 
 
@@ -29,16 +32,13 @@ class SpanQuery(nn.Module):
         if not trainable:
             self.query_seg.requires_grad = False
 
-        self.project = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU()
-        )
+        self.project = nn.Sequential(nn.Linear(hidden_size, hidden_size), nn.ReLU())
 
     def forward(self, h, *args):
         # h of shape [B, L, D]
         # query_seg of shape [D, max_width]
 
-        span_rep = torch.einsum('bld, ds->blsd', h, self.query_seg)
+        span_rep = torch.einsum("bld, ds->blsd", h, self.query_seg)
 
         return self.project(span_rep)
 
@@ -73,8 +73,7 @@ class SpanCAT(nn.Module):
         self.query_seg = nn.Parameter(torch.randn(128, max_width))
 
         self.project = nn.Sequential(
-            nn.Linear(hidden_size + 128, hidden_size),
-            nn.ReLU()
+            nn.Linear(hidden_size + 128, hidden_size), nn.ReLU()
         )
 
     def forward(self, h, *args):
@@ -95,19 +94,18 @@ class SpanCAT(nn.Module):
 
 
 class SpanConvBlock(nn.Module):
-    def __init__(self, hidden_size, kernel_size, span_mode='conv_normal'):
+    def __init__(self, hidden_size, kernel_size, span_mode="conv_normal"):
         super().__init__()
 
-        if span_mode == 'conv_conv':
-            self.conv = nn.Conv1d(hidden_size, hidden_size,
-                                  kernel_size=kernel_size)
+        if span_mode == "conv_conv":
+            self.conv = nn.Conv1d(hidden_size, hidden_size, kernel_size=kernel_size)
 
             # initialize the weights
-            nn.init.kaiming_uniform_(self.conv.weight, nonlinearity='relu')
+            nn.init.kaiming_uniform_(self.conv.weight, nonlinearity="relu")
 
-        elif span_mode == 'conv_max':
+        elif span_mode == "conv_max":
             self.conv = nn.MaxPool1d(kernel_size=kernel_size, stride=1)
-        elif span_mode == 'conv_mean' or span_mode == 'conv_sum':
+        elif span_mode == "conv_mean" or span_mode == "conv_sum":
             self.conv = nn.AvgPool1d(kernel_size=kernel_size, stride=1)
 
         self.span_mode = span_mode
@@ -116,7 +114,7 @@ class SpanConvBlock(nn.Module):
 
     def forward(self, x):
 
-        x = torch.einsum('bld->bdl', x)
+        x = torch.einsum("bld->bdl", x)
 
         if self.pad > 0:
             x = F.pad(x, (0, self.pad), "constant", 0)
@@ -126,7 +124,7 @@ class SpanConvBlock(nn.Module):
         if self.span_mode == "conv_sum":
             x = x * (self.pad + 1)
 
-        return torch.einsum('bdl->bld', x)
+        return torch.einsum("bdl->bld", x)
 
 
 class SpanConv(nn.Module):
@@ -140,10 +138,7 @@ class SpanConv(nn.Module):
         for kernel in kernels:
             self.convs.append(SpanConvBlock(hidden_size, kernel, span_mode))
 
-        self.project = nn.Sequential(
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size)
-        )
+        self.project = nn.Sequential(nn.ReLU(), nn.Linear(hidden_size, hidden_size))
 
     def forward(self, x, *args):
 
@@ -168,7 +163,8 @@ class SpanEndpointsBlock(nn.Module):
         B, L, D = x.size()
 
         span_idx = torch.LongTensor(
-            [[i, i + self.kernel_size - 1] for i in range(L)]).to(x.device)
+            [[i, i + self.kernel_size - 1] for i in range(L)]
+        ).to(x.device)
 
         x = F.pad(x, (0, 0, 0, self.kernel_size - 1), "constant", 0)
 
@@ -187,24 +183,22 @@ class ConvShare(nn.Module):
         self.max_width = max_width
 
         self.conv_weigth = nn.Parameter(
-            torch.randn(hidden_size, hidden_size, max_width))
-
-        nn.init.kaiming_uniform_(self.conv_weigth, nonlinearity='relu')
-
-        self.project = nn.Sequential(
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size)
+            torch.randn(hidden_size, hidden_size, max_width)
         )
+
+        nn.init.kaiming_uniform_(self.conv_weigth, nonlinearity="relu")
+
+        self.project = nn.Sequential(nn.ReLU(), nn.Linear(hidden_size, hidden_size))
 
     def forward(self, x, *args):
         span_reps = []
 
-        x = torch.einsum('bld->bdl', x)
+        x = torch.einsum("bld->bdl", x)
 
         for i in range(self.max_width):
             pad = i
             x_i = F.pad(x, (0, pad), "constant", 0)
-            conv_w = self.conv_weigth[:, :, :i + 1]
+            conv_w = self.conv_weigth[:, :, : i + 1]
             out_i = F.conv1d(x_i, conv_w)
             span_reps.append(out_i.transpose(-1, -2))
 
@@ -269,7 +263,8 @@ class SpanMarker(nn.Module):
         cat = self.out_project(cat)
 
         # reshape
-        return cat.view(B, L, self.max_width, D)
+        # return cat.view(B, L, self.max_width, D)
+        return cat
 
 
 class SpanMarkerV0(nn.Module):
@@ -283,7 +278,9 @@ class SpanMarkerV0(nn.Module):
         self.project_start = create_projection_layer(hidden_size, dropout)
         self.project_end = create_projection_layer(hidden_size, dropout)
 
-        self.out_project = create_projection_layer(hidden_size * 2, dropout, hidden_size)
+        self.out_project = create_projection_layer(
+            hidden_size * 2, dropout, hidden_size
+        )
 
     def forward(self, h: torch.Tensor, span_idx: torch.Tensor) -> torch.Tensor:
         B, L, D = h.size()
@@ -314,12 +311,12 @@ class ConvShareV2(nn.Module):
     def forward(self, x, *args):
         span_reps = []
 
-        x = torch.einsum('bld->bdl', x)
+        x = torch.einsum("bld->bdl", x)
 
         for i in range(self.max_width):
             pad = i
             x_i = F.pad(x, (0, pad), "constant", 0)
-            conv_w = self.conv_weigth[:, :, :i + 1]
+            conv_w = self.conv_weigth[:, :, : i + 1]
             out_i = F.conv1d(x_i, conv_w)
             span_reps.append(out_i.transpose(-1, -2))
 
@@ -336,33 +333,32 @@ class SpanRepLayer(nn.Module):
     def __init__(self, hidden_size, max_width, span_mode, **kwargs):
         super().__init__()
 
-        if span_mode == 'marker':
+        if span_mode == "marker":
             self.span_rep_layer = SpanMarker(hidden_size, max_width, **kwargs)
-        elif span_mode == 'markerV0':
+        elif span_mode == "markerV0":
             self.span_rep_layer = SpanMarkerV0(hidden_size, max_width, **kwargs)
-        elif span_mode == 'query':
-            self.span_rep_layer = SpanQuery(
-                hidden_size, max_width, trainable=True)
-        elif span_mode == 'mlp':
+        elif span_mode == "query":
+            self.span_rep_layer = SpanQuery(hidden_size, max_width, trainable=True)
+        elif span_mode == "mlp":
             self.span_rep_layer = SpanMLP(hidden_size, max_width)
-        elif span_mode == 'cat':
+        elif span_mode == "cat":
             self.span_rep_layer = SpanCAT(hidden_size, max_width)
-        elif span_mode == 'conv_conv':
+        elif span_mode == "conv_conv":
             self.span_rep_layer = SpanConv(
-                hidden_size, max_width, span_mode='conv_conv')
-        elif span_mode == 'conv_max':
+                hidden_size, max_width, span_mode="conv_conv"
+            )
+        elif span_mode == "conv_max":
+            self.span_rep_layer = SpanConv(hidden_size, max_width, span_mode="conv_max")
+        elif span_mode == "conv_mean":
             self.span_rep_layer = SpanConv(
-                hidden_size, max_width, span_mode='conv_max')
-        elif span_mode == 'conv_mean':
-            self.span_rep_layer = SpanConv(
-                hidden_size, max_width, span_mode='conv_mean')
-        elif span_mode == 'conv_sum':
-            self.span_rep_layer = SpanConv(
-                hidden_size, max_width, span_mode='conv_sum')
-        elif span_mode == 'conv_share':
+                hidden_size, max_width, span_mode="conv_mean"
+            )
+        elif span_mode == "conv_sum":
+            self.span_rep_layer = SpanConv(hidden_size, max_width, span_mode="conv_sum")
+        elif span_mode == "conv_share":
             self.span_rep_layer = ConvShare(hidden_size, max_width)
         else:
-            raise ValueError(f'Unknown span mode {span_mode}')
+            raise ValueError(f"Unknown span mode {span_mode}")
 
     def forward(self, x, *args):
 

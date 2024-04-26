@@ -210,7 +210,7 @@ class VAEDataLoader:
 
         spans_idx = []
         for i in range(length):
-            spans_idx.extend([(i, i + j) for j in range(max_width)])
+            spans_idx.extend([(i, i + j) for j in range(max_width) if i + j < length])
 
         dict_lab = self.get_dict(ner, classes_to_id) if ner else defaultdict(int)
 
@@ -218,15 +218,9 @@ class VAEDataLoader:
         span_label = torch.LongTensor([dict_lab[i] for i in spans_idx])
         spans_idx = torch.LongTensor(spans_idx)
 
-        # mask for valid spans
-        valid_span_mask = spans_idx[:, 1] > length - 1
-
         if learn_only_positives:
             non_entity_mask = span_label == 0
-            valid_span_mask = torch.logical_or(valid_span_mask, non_entity_mask)
-
-        # mask invalid positions
-        span_label = span_label.masked_fill(valid_span_mask, -1)
+            span_label = torch.masked_fill(span_label, non_entity_mask, -1)
 
         return {
             "tokens": tokens,
@@ -247,8 +241,10 @@ class VAEDataLoader:
 
     def batch_format(self, raw_batch: List[Dict]):
 
+        tokens = [data_point["tokens"] for data_point in raw_batch]
+
         # Converts to list of inputs
-        tokens = [
+        token_inputs = [
             [self.token_tokenizer.sep_token]
             + data_point["tokens"]
             + [self.token_tokenizer.sep_token]
@@ -256,7 +252,7 @@ class VAEDataLoader:
         ]
 
         token_batch = self.token_tokenizer(
-            tokens,
+            token_inputs,
             padding=True,
             truncation=True,
             is_split_into_words=True,
@@ -272,7 +268,7 @@ class VAEDataLoader:
             )
             for i in range(len(raw_batch))
         ]
-        word_lengths = [len(seq) - 2 for seq in tokens]
+        word_lengths = [len(seq) - 2 for seq in token_inputs]
         word_rep_mask = torch.arange(max(word_lengths)).unsqueeze(0).expand(
             len(raw_batch), -1
         ) < torch.tensor(word_lengths).unsqueeze(-1)
@@ -303,6 +299,7 @@ class VAEDataLoader:
             padding=True,
             truncation=True,
             is_split_into_words=True,
+            add_special_tokens=False,
             return_tensors="pt",
         ).to(self.device)
 
@@ -317,13 +314,13 @@ class VAEDataLoader:
             [data_point["span_idx"] for data_point in raw_batch],
             batch_first=True,
             padding_value=0,
-        )
+        ).to(self.device)
 
         span_label = pad_sequence(
             [data_point["span_label"] for data_point in raw_batch],
             batch_first=True,
             padding_value=-1,
-        )
+        ).to(self.device)
 
         span_mask = span_label != -1
 
@@ -339,16 +336,17 @@ class VAEDataLoader:
 
         return {
             "token_inputs": token_batch,
+            "token_lengths": token_lengths,
             "label_inputs": label_batch,
             "label_mask": label_mask,
             "label_lengths": label_lengths,
-            "token_lengths": token_lengths,
             "combined_lengths": combined_lengths,
             "word_ids": word_ids,
             "word_rep_mask": word_rep_mask,
             "span_idx": span_idx,
             "span_label": span_label,
             "entity_type_mask": entity_type_mask,
+            "tokens": tokens,
             "entities": entities,
             "classes_to_id": class_to_ids,
             "id_to_classes": id_to_classes,

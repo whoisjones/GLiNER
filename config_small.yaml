@@ -1,6 +1,6 @@
 # Learning Rate
-lr_encoder: 1e-6
-lr_others: 5e-6
+lr_encoder: 1e-5
+lr_others: 5e-5
 
 # Training Parameters
 num_steps: 30000
@@ -23,11 +23,11 @@ freeze_token_rep: false
 # Directory Paths
 root_dir: /vol/tmp/goldejon/gliner
 log_dir: logs
-train_data: train_datasets/pilener_train.json
+train_data: train_datasets/ontonotes.json
 eval_data: eval_datasets/NER
 
 # "none" if no pretrained model 
-prev_path: /vol/tmp/goldejon/gliner/logs/deberta-v3-small/fewnerd/2024-03-13_09-53-49/model_30000
+prev_path: none
 
 # Training Specifics
 size_sup: -1

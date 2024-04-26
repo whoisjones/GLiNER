@@ -89,7 +89,7 @@ def train(
         pbar.set_description(description)
 
     if eval_data:
-        get_for_all_path(model, step, log_dir, eval_data)
+        get_for_all_path(model=model, log_dir=log_dir, data_paths=eval_data)
 
 
 def create_parser():
@@ -100,6 +100,7 @@ def create_parser():
     parser.add_argument(
         "--log_dir", type=str, default="logs", help="Path to the log directory"
     )
+    parser.add_argument("--train_data", type=str, help="Path to the training dataset")
     parser.add_argument("--do_eval", action="store_true", help="Run evaluation")
     return parser
 
@@ -112,76 +113,77 @@ def load_config_as_namespace(config_file):
 
 if __name__ == "__main__":
     # set seeds
-    random.seed(123)
-    np.random.seed(123)
-    torch.manual_seed(123)
-    torch.cuda.manual_seed_all(123)
+    for seed in [123, 234, 345]:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
-    # parse args
-    parser = create_parser()
-    args = parser.parse_args()
+        # parse args
+        parser = create_parser()
+        args = parser.parse_args()
 
-    # load config
-    config = load_config_as_namespace(args.config)
+        # load config
+        config = load_config_as_namespace(args.config)
 
-    model_name_log = config.model_name.split("/")[-1]
-    dataset_log = config.train_data.split("/")[-1].replace(".json", "")
-    config.log_dir = os.path.join(
-        config.root_dir,
-        config.log_dir,
-        model_name_log,
-        dataset_log,
-        datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-    )
+        model_name_log = config.model_name.split("/")[-1]
+        dataset_log = args.train_data.split("/")[-1].replace(".json", "")
+        config.log_dir = os.path.join(
+            config.root_dir,
+            config.log_dir,
+            model_name_log,
+            dataset_log,
+            datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+        )
 
-    if not os.path.exists(config.log_dir):
-        os.makedirs(config.log_dir)
+        if not os.path.exists(config.log_dir):
+            os.makedirs(config.log_dir)
 
-    try:
-        if "litset" in config.train_data:
-            with open(
-                os.path.join(config.root_dir, "train_datasets/litset.jsonl"), "r"
-            ) as f:
-                data = []
-                for line in f.readlines():
-                    data.append(json.loads(line))
-                data = [
-                    x for x in data if x["ner"]
-                ]  # Comment this out if you want to use the entire dataset
+        try:
+            if "litset" in args.train_data:
+                with open(
+                    os.path.join(config.root_dir, "train_datasets/litset.jsonl"), "r"
+                ) as f:
+                    data = []
+                    for line in f.readlines():
+                        data.append(json.loads(line))
+                    data = [
+                        x for x in data if x["ner"]
+                    ]  # Comment this out if you want to use the entire dataset
+            else:
+                with open(os.path.join(config.root_dir, args.train_data), "r") as f:
+                    data = json.load(f)
+        except:
+            data = sample_train_data(args.train_data, 10000)
+
+        if config.do_eval:
+            val_data_dir = os.path.join(config.root_dir, config.eval_data)
+
+        if config.prev_path != "none":
+            model = load_model(config.prev_path)
+            model.config = config
         else:
-            with open(os.path.join(config.root_dir, config.train_data), "r") as f:
-                data = json.load(f)
-    except:
-        data = sample_train_data(config.train_data, 10000)
+            model = GLiNER(config)
 
-    if config.do_eval:
-        val_data_dir = os.path.join(config.root_dir, config.eval_data)
+        if torch.cuda.is_available():
+            model = model.cuda()
 
-    if config.prev_path != "none":
-        model = load_model(config.prev_path)
-        model.config = config
-    else:
-        model = GLiNER(config)
+        lr_encoder = float(config.lr_encoder)
+        lr_others = float(config.lr_others)
 
-    if torch.cuda.is_available():
-        model = model.cuda()
+        optimizer = model.get_optimizer(lr_encoder, lr_others, config.freeze_token_rep)
 
-    lr_encoder = float(config.lr_encoder)
-    lr_others = float(config.lr_others)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    optimizer = model.get_optimizer(lr_encoder, lr_others, config.freeze_token_rep)
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    train(
-        model,
-        optimizer,
-        train_data=data,
-        eval_data=val_data_dir if config.do_eval else None,
-        num_steps=config.num_steps,
-        eval_every=config.eval_every,
-        log_dir=config.log_dir,
-        warmup_ratio=config.warmup_ratio,
-        train_batch_size=config.train_batch_size,
-        device=device,
-    )
+        train(
+            model,
+            optimizer,
+            train_data=data,
+            eval_data=val_data_dir if config.do_eval else None,
+            num_steps=config.num_steps,
+            eval_every=config.eval_every,
+            log_dir=config.log_dir,
+            warmup_ratio=config.warmup_ratio,
+            train_batch_size=config.train_batch_size,
+            device=device,
+        )

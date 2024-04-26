@@ -46,6 +46,6 @@ if __name__ == "__main__":
     dataset = load_dataset("numind/NuNER")
     processed_data = process_entities(dataset)
 
-    save_data_to_file(processed_data, 'nuner_train.json')
+    save_data_to_file(processed_data, '/vol/tmp/goldejon/gliner/train_datasets/nuner_train.json')
 
     print("dataset size:", len(processed_data))

@@ -1,4 +1,5 @@
 from typing import List
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -16,6 +17,7 @@ from transformers import (
 from .config import VAEConfig
 from modules.layers import LstmSeq2SeqEncoder
 from modules.span_rep import SpanRepLayer
+from modules.evaluator import Evaluator, greedy_search
 
 
 class LabelEncoder(nn.Module):
@@ -23,37 +25,50 @@ class LabelEncoder(nn.Module):
         self, name_or_path: str, latent_dimension: int = 128, hidden_size: int = 768
     ):
         super().__init__()
-        self.config = AutoConfig.from_pretrained(name_or_path)
+        self.config = AutoConfig.from_pretrained(
+            name_or_path, output_hidden_states=True
+        )
         self.model = AutoModel.from_config(self.config)
+
+        for param in self.model.parameters():
+            param.requires_grad = False
 
         self.tanh = nn.Tanh()
         self.relu = nn.ReLU()
+        self.elu = nn.ELU()
         self.sigmoid = nn.Sigmoid()
 
         self.mu = nn.Linear(hidden_size, latent_dimension)
         self.sigma = nn.Linear(hidden_size, latent_dimension)
         self.up_proj = nn.Linear(latent_dimension, hidden_size)
-        self.re_proj = nn.Linear(hidden_size, hidden_size)
-
-        self.N = torch.distributions.Normal(0, 1)
-        if torch.cuda.is_available():
-            self.N.loc = self.N.loc.cuda()
-            self.N.scale = self.N.scale.cuda()
-        else:
-            self.N.loc = self.N.loc.cpu()
-            self.N.scale = self.N.scale.cpu()
+        # self.re_proj = nn.Linear(hidden_size, hidden_size)
 
     def forward(self, inputs: BatchEncoding):
-        outputs = self.tanh(self.model(**inputs)[0])
+        outputs = self.model(**inputs)
+        """
+        mu = self.mu(outputs.last_hidden_state)
+        log_var = self.sigma(outputs.last_hidden_state)
+        sigma = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(sigma)
+        z = eps * sigma + mu
+        embeddings = self.model.embeddings.LayerNorm(self.up_proj(z))
 
-        mu = self.mu(outputs)
-        sigma = torch.exp(self.sigma(outputs))
-        z = mu + sigma * self.N.sample(mu.shape)
-        kl_loss = (sigma**2 + mu**2 - torch.log(sigma) - 1 / 2).sum()
+        recon_loss = torch.nn.functional.mse_loss(
+            embeddings[inputs["attention_mask"].bool()],
+            outputs.hidden_states[0][inputs["attention_mask"].bool()],
+        )
 
-        outputs = self.relu(self.up_proj(z))
-        embeddings = self.sigmoid(self.re_proj(outputs))
-        return embeddings, kl_loss
+        kl_loss = torch.mean(
+            -0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp(), dim=1), dim=0
+        ).mean()
+
+        vae_loss = recon_loss + kl_loss
+        """
+
+        return {
+            "hidden_states": outputs.last_hidden_state,
+            "vae_loss": torch.tensor(0.0),
+        }
 
 
 class VAEModel(PreTrainedModel):
@@ -101,14 +116,16 @@ class VAEModel(PreTrainedModel):
 
     def forward(self, batch):
         # compute span representation
-        scores, kl_loss = self.compute_score_train(batch)
+        outputs = self.step(batch)
+        scores = outputs.pop("logits")
         batch_size = scores.shape[0]
-        num_classes = batch["num_classes"]
+        num_classes = max(batch["num_classes"])
 
         # loss for filtering classifier
         logits_label = scores.view(-1, num_classes)
         labels = batch["span_label"].view(-1)  # (batch_size * num_spans)
         mask_label = labels != -1  # (batch_size * num_spans)
+        avg_over = mask_label.sum().item()
         labels.masked_fill_(~mask_label, 0)  # Set the labels of padding tokens to 0
 
         # one-hot encoding
@@ -139,10 +156,12 @@ class VAEModel(PreTrainedModel):
         weight_c = labels_one_hot + 1
         # apply mask
         all_losses = all_losses * mask_label.float() * weight_c
-        return all_losses.sum() + kl_loss
+        outputs["loss"] = (all_losses.sum() + outputs["vae_loss"]) / avg_over
+        return outputs
 
-    def compute_score_train(self, batch):
-        label_latents, kl_loss = self.label_encoder(batch["label_inputs"])
+    def step(self, batch):
+        vae_output = self.label_encoder(batch["label_inputs"])
+        label_latents = vae_output["hidden_states"]
 
         token_embeddings = self.token_encoder.embeddings(
             batch["token_inputs"]["input_ids"]
@@ -196,10 +215,49 @@ class VAEModel(PreTrainedModel):
         # compute final entity type representation (FFN)
         entity_type_rep = self.prompt_rep_layer(label_outputs)
 
-        # similarity score
-        scores = torch.einsum("BLKD,BCD->BLKC", span_rep, entity_type_rep)
+        # similarity score (B: batch, L: num_spans, C: num_classes)
+        scores = torch.einsum("BSD,BLD->BSL", span_rep, entity_type_rep)
 
-        return scores, kl_loss
+        return {
+            "logits": scores,
+            "vae_loss": vae_output["vae_loss"],
+        }
+
+    def evaluate(
+        self,
+        data_loader,
+        flat_ner=False,
+        threshold=0.5,
+    ):
+        self.eval()
+        all_preds = []
+        all_trues = []
+        for batch in tqdm(data_loader):
+            batch_predictions = self.predict(batch, flat_ner, threshold)
+            all_preds.extend(batch_predictions)
+            all_trues.extend(batch["entities"])
+        evaluator = Evaluator(all_trues, all_preds)
+        metrics = evaluator.evaluate()
+        return metrics
+
+    @torch.no_grad()
+    def predict(self, batch, flat_ner=False, threshold=0.5):
+        self.eval()
+        outputs = self.step(batch)
+        local_scores = outputs["logits"]
+        spans = []
+        for i, _ in enumerate(batch["tokens"]):
+            local_i = local_scores[i]
+            wh_i = [i.tolist() for i in torch.where(torch.sigmoid(local_i) > threshold)]
+            span_i = []
+            for s, k, c in zip(*wh_i):
+                if s + k < len(batch["tokens"][i]):
+                    span_i.append(
+                        (s, s + k, batch["id_to_classes"][c + 1], local_i[s, k, c])
+                    )
+            span_i = greedy_search(span_i, flat_ner)
+            spans.append(span_i)
+        return spans
 
     def subtoken_pooling(self, word_outputs: List, word_ids: List, how: str = "first"):
         # sanity check

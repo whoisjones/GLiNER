@@ -66,20 +66,21 @@ def train(
                 x[k] = v.to(device)
 
         try:
-            loss = model(x)  # Forward pass
+            outputs = model(x)  # Forward pass
         except:
             continue
 
         # check if loss is nan
-        if torch.isnan(loss):
+        if torch.isnan(outputs["loss"]):
             continue
 
+        loss = outputs["loss"]
         loss.backward()  # Compute gradients
         optimizer.step()  # Update parameters
         scheduler.step()  # Update learning rate schedule
         optimizer.zero_grad()  # Reset gradients
 
-        description = f"step: {step} | epoch: {step // len(train_loader)} | loss: {loss.item():.2f}"
+        description = f"step: {step} | epoch: {step // len(train_loader)} | loss: {loss.item():.2f} | vae: {outputs['vae_loss'].item():.2f}"
 
         if (step + 1) % eval_every == 0:
             current_path = os.path.join(log_dir, f"model_{step + 1}")

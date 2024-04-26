@@ -140,7 +140,7 @@ def transform_synonym_metrics(metrics_list, dataset_name, synonyms):
 
 
 @torch.no_grad()
-def get_for_one_path(path, model, synonyms=None):
+def get_for_one_path(path, model, dataloader=None, synonyms=None):
     # load the dataset
     _, _, test_dataset, entity_types = create_dataset(path)
 
@@ -162,13 +162,16 @@ def get_for_one_path(path, model, synonyms=None):
         if any([i in data_name for i in ["ACE", "GENIA", "Corpus"]]):
             flat_ner = False
 
+        if dataloader:
+            test_dataset = dataloader.get_validation_loader(
+                test_dataset, batch_size=12, shuffle=False, entity_types=entity_types
+            )
+
         # evaluate the model
         metrics = model.evaluate(
             test_dataset,
             flat_ner=flat_ner,
             threshold=0.5,
-            batch_size=12,
-            entity_types=entity_types,
         )
 
         if metrics:
@@ -223,7 +226,9 @@ def save_metrics_synonyms(all_results, log_dir):
         dataset_scores.to_pickle(os.path.join(log_dir, f"{dataset}.pkl"))
 
 
-def get_for_all_path(model, log_dir, data_paths, only_zero_shot=True, synonyms=None):
+def get_for_all_path(
+    model, log_dir, data_paths, dataloader=None, only_zero_shot=True, synonyms=None
+):
     all_paths = glob.glob(f"{data_paths}/*")
 
     all_paths = sorted(all_paths)
@@ -256,7 +261,7 @@ def get_for_all_path(model, log_dir, data_paths, only_zero_shot=True, synonyms=N
         dataset_name = eval_ds.split("/")[-1]
 
         if "sample_" not in eval_ds:
-            metrics = get_for_one_path(eval_ds, model, synonyms)
+            metrics = get_for_one_path(eval_ds, model, dataloader, synonyms)
 
             if metrics is not None:
                 metrics["zeroshot"] = (
