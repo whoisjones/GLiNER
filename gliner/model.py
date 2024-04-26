@@ -11,11 +11,14 @@ from gliner.modules.base import InstructBase
 from gliner.modules.evaluator import Evaluator, greedy_search
 from gliner.modules.span_rep import SpanRepLayer
 from gliner.modules.token_rep import TokenRepLayer
-from gliner.modules.token_splitter import WhitespaceTokenSplitter, MecabKoTokenSplitter, SpaCyTokenSplitter
+from gliner.modules.token_splitter import (
+    WhitespaceTokenSplitter,
+    MecabKoTokenSplitter,
+    SpaCyTokenSplitter,
+)
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
-
 
 
 class GLiNER(InstructBase, PyTorchModelHubMixin):
@@ -27,7 +30,7 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         if "token_splitter" not in self.config:
             self.token_splitter = WhitespaceTokenSplitter()
         elif self.config.token_splitter == "spacy":
-            lang = getattr(self.config, 'token_splitter_lang', None)
+            lang = getattr(self.config, "token_splitter_lang", None)
             self.token_splitter = SpaCyTokenSplitter(lang=lang)
         elif self.config.token_splitter == "mecab-ko":
             self.token_splitter = MecabKoTokenSplitter()
@@ -37,9 +40,13 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         self.sep_token = "<<SEP>>"
 
         # usually a pretrained bidirectional transformer, returns first subtoken representation
-        self.token_rep_layer = TokenRepLayer(model_name=config.model_name, fine_tune=config.fine_tune,
-                                             subtoken_pooling=config.subtoken_pooling, hidden_size=config.hidden_size,
-                                             add_tokens=[self.entity_token, self.sep_token])
+        self.token_rep_layer = TokenRepLayer(
+            model_name=config.model_name,
+            fine_tune=config.fine_tune,
+            subtoken_pooling=config.subtoken_pooling,
+            hidden_size=config.hidden_size,
+            add_tokens=[self.entity_token, self.sep_token],
+        )
 
         # hierarchical representation of tokens (zaratiana et al, 2022)
         # https://arxiv.org/pdf/2203.14710.pdf
@@ -65,7 +72,7 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
             nn.Linear(config.hidden_size, config.hidden_size * 4),
             nn.Dropout(config.dropout),
             nn.ReLU(),
-            nn.Linear(config.hidden_size * 4, config.hidden_size)
+            nn.Linear(config.hidden_size * 4, config.hidden_size),
         )
 
     def get_optimizer(self, lr_encoder, lr_others, freeze_token_rep=False):
@@ -85,7 +92,9 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
 
         if not freeze_token_rep:
             # If token_rep_layer should not be frozen, add it to the optimizer with its learning rate
-            param_groups.append({"params": self.token_rep_layer.parameters(), "lr": lr_encoder})
+            param_groups.append(
+                {"params": self.token_rep_layer.parameters(), "lr": lr_encoder}
+            )
         else:
             # If token_rep_layer should be frozen, explicitly set requires_grad to False for its parameters
             for param in self.token_rep_layer.parameters():
@@ -133,14 +142,23 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
 
         # create a mask using num_classes_all (0, if it exceeds the number of classes, 1 otherwise)
         max_num_classes = max(num_classes_all)
-        entity_type_mask = torch.arange(max_num_classes).unsqueeze(0).expand(len(num_classes_all), -1).to(
-            x["span_mask"].device)
-        entity_type_mask = entity_type_mask < torch.tensor(num_classes_all).unsqueeze(-1).to(
-            x["span_mask"].device)  # [batch_size, max_num_classes]
+        entity_type_mask = (
+            torch.arange(max_num_classes)
+            .unsqueeze(0)
+            .expand(len(num_classes_all), -1)
+            .to(x["span_mask"].device)
+        )
+        entity_type_mask = entity_type_mask < torch.tensor(num_classes_all).unsqueeze(
+            -1
+        ).to(
+            x["span_mask"].device
+        )  # [batch_size, max_num_classes]
 
         # compute all token representations
         bert_output = self.token_rep_layer(new_tokens, new_length)
-        word_rep_w_prompt = bert_output["embeddings"]  # embeddings for all tokens (with prompt)
+        word_rep_w_prompt = bert_output[
+            "embeddings"
+        ]  # embeddings for all tokens (with prompt)
         mask_w_prompt = bert_output["mask"]  # mask for all tokens (with prompt)
 
         # get word representation (after [SEP]), mask (after [SEP]) and entity type representation (before [SEP])
@@ -148,28 +166,48 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         mask = []  # mask (after [SEP])
         entity_type_rep = []  # entity type representation (before [SEP])
         for i in range(len(x["tokens"])):
-            prompt_entity_length = all_len_prompt[i]  # length of prompt for this example
+            prompt_entity_length = all_len_prompt[
+                i
+            ]  # length of prompt for this example
             # get word representation (after [SEP])
-            word_rep.append(word_rep_w_prompt[i, prompt_entity_length:prompt_entity_length + x["seq_length"][i]])
+            word_rep.append(
+                word_rep_w_prompt[
+                    i, prompt_entity_length : prompt_entity_length + x["seq_length"][i]
+                ]
+            )
             # get mask (after [SEP])
-            mask.append(mask_w_prompt[i, prompt_entity_length:prompt_entity_length + x["seq_length"][i]])
+            mask.append(
+                mask_w_prompt[
+                    i, prompt_entity_length : prompt_entity_length + x["seq_length"][i]
+                ]
+            )
 
             # get entity type representation (before [SEP])
-            entity_rep = word_rep_w_prompt[i, :prompt_entity_length - 1]  # remove [SEP]
-            entity_rep = entity_rep[0::2]  # it means that we take every second element starting from the second one
+            entity_rep = word_rep_w_prompt[
+                i, : prompt_entity_length - 1
+            ]  # remove [SEP]
+            entity_rep = entity_rep[
+                0::2
+            ]  # it means that we take every second element starting from the second one
             entity_type_rep.append(entity_rep)
 
         # padding for word_rep, mask and entity_type_rep
-        word_rep = pad_sequence(word_rep, batch_first=True)  # [batch_size, seq_len, hidden_size]
+        word_rep = pad_sequence(
+            word_rep, batch_first=True
+        )  # [batch_size, seq_len, hidden_size]
         mask = pad_sequence(mask, batch_first=True)  # [batch_size, seq_len]
-        entity_type_rep = pad_sequence(entity_type_rep, batch_first=True)  # [batch_size, len_types, hidden_size]
+        entity_type_rep = pad_sequence(
+            entity_type_rep, batch_first=True
+        )  # [batch_size, len_types, hidden_size]
 
         # compute span representation
         word_rep = self.rnn(word_rep, mask)
         span_rep = self.span_rep_layer(word_rep, span_idx)
 
         # compute final entity type representation (FFN)
-        entity_type_rep = self.prompt_rep_layer(entity_type_rep)  # (batch_size, len_types, hidden_size)
+        entity_type_rep = self.prompt_rep_layer(
+            entity_type_rep
+        )  # (batch_size, len_types, hidden_size)
         num_classes = entity_type_rep.shape[1]  # number of entity types
 
         # similarity score
@@ -189,16 +227,23 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         labels.masked_fill_(~mask_label, 0)  # Set the labels of padding tokens to 0
 
         # one-hot encoding
-        labels_one_hot = torch.zeros(labels.size(0), num_classes + 1, dtype=torch.float32).to(scores.device)
-        labels_one_hot.scatter_(1, labels.unsqueeze(1), 1)  # Set the corresponding index to 1
+        labels_one_hot = torch.zeros(
+            labels.size(0), num_classes + 1, dtype=torch.float32
+        ).to(scores.device)
+        labels_one_hot.scatter_(
+            1, labels.unsqueeze(1), 1
+        )  # Set the corresponding index to 1
         labels_one_hot = labels_one_hot[:, 1:]  # Remove the first column
         # Shape of labels_one_hot: (batch_size * num_spans, num_classes)
 
         # compute loss (without reduction)
-        all_losses = F.binary_cross_entropy_with_logits(logits_label, labels_one_hot,
-                                                        reduction="none")
+        all_losses = F.binary_cross_entropy_with_logits(
+            logits_label, labels_one_hot, reduction="none"
+        )
         # mask loss using entity_type_mask (B, C)
-        masked_loss = all_losses.view(batch_size, -1, num_classes) * entity_type_mask.unsqueeze(1)
+        masked_loss = all_losses.view(
+            batch_size, -1, num_classes
+        ) * entity_type_mask.unsqueeze(1)
         all_losses = masked_loss.view(-1, num_classes)
         # expand mask_label to all_losses
         mask_label = mask_label.unsqueeze(-1).expand_as(all_losses)
@@ -241,11 +286,13 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         mask = mask_w_prompt[:, prompt_entity_length:]
 
         # get_entity_type_rep
-        entity_type_rep = word_rep_w_prompt[:, :prompt_entity_length - 1, :]
+        entity_type_rep = word_rep_w_prompt[:, : prompt_entity_length - 1, :]
         # extract [ENT] tokens (which are at even positions in entity_type_rep)
         entity_type_rep = entity_type_rep[:, 0::2, :]
 
-        entity_type_rep = self.prompt_rep_layer(entity_type_rep)  # (batch_size, len_types, hidden_size)
+        entity_type_rep = self.prompt_rep_layer(
+            entity_type_rep
+        )  # (batch_size, len_types, hidden_size)
 
         word_rep = self.rnn(word_rep, mask)
 
@@ -264,22 +311,34 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         spans = []
         for i, _ in enumerate(x["tokens"]):
             probs_i = probs[i]
-            
+
             wh_i = [i.tolist() for i in torch.where(probs_i > threshold)]
             span_i = []
-            
+
             for s, k, c in zip(*wh_i):
                 if s + k < len(x["tokens"][i]):
-                    span_i.append((s, s + k, x["id_to_classes"][c + 1], probs_i[s, k, c].item()))
-            
+                    span_i.append(
+                        (s, s + k, x["id_to_classes"][c + 1], probs_i[s, k, c].item())
+                    )
+
             span_i = greedy_search(span_i, flat_ner, multi_label=multi_label)
             spans.append(span_i)
         return spans
 
-    def predict_entities(self, text, labels, flat_ner=True, threshold=0.5, multi_label=False):
-        return self.batch_predict_entities([text], labels, flat_ner=flat_ner, threshold=threshold, multi_label=multi_label)[0]
+    def predict_entities(
+        self, text, labels, flat_ner=True, threshold=0.5, multi_label=False
+    ):
+        return self.batch_predict_entities(
+            [text],
+            labels,
+            flat_ner=flat_ner,
+            threshold=threshold,
+            multi_label=multi_label,
+        )[0]
 
-    def batch_predict_entities(self, texts, labels, flat_ner=True, threshold=0.5, multi_label=False):
+    def batch_predict_entities(
+        self, texts, labels, flat_ner=True, threshold=0.5, multi_label=False
+    ):
         """
         Predict entities for a batch of texts.
         texts:  List of texts | List[str]
@@ -305,30 +364,44 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
 
         input_x = [{"tokenized_text": tk, "ner": None} for tk in all_tokens]
         x = self.collate_fn(input_x, labels)
-        outputs = self.predict(x, flat_ner=flat_ner, threshold=threshold, multi_label=multi_label)
+        outputs = self.predict(
+            x, flat_ner=flat_ner, threshold=threshold, multi_label=multi_label
+        )
 
         all_entities = []
         for i, output in enumerate(outputs):
             start_token_idx_to_text_idx = all_start_token_idx_to_text_idx[i]
             end_token_idx_to_text_idx = all_end_token_idx_to_text_idx[i]
             entities = []
-            for start_token_idx, end_token_idx, ent_type,ent_score in output:
+            for start_token_idx, end_token_idx, ent_type, ent_score in output:
                 start_text_idx = start_token_idx_to_text_idx[start_token_idx]
                 end_text_idx = end_token_idx_to_text_idx[end_token_idx]
-                entities.append({
-                    "start": start_token_idx_to_text_idx[start_token_idx],
-                    "end": end_token_idx_to_text_idx[end_token_idx],
-                    "text": texts[i][start_text_idx:end_text_idx],
-                    "label": ent_type,
-                    "score": ent_score
-                })
+                entities.append(
+                    {
+                        "start": start_token_idx_to_text_idx[start_token_idx],
+                        "end": end_token_idx_to_text_idx[end_token_idx],
+                        "text": texts[i][start_text_idx:end_text_idx],
+                        "label": ent_type,
+                        "score": ent_score,
+                    }
+                )
             all_entities.append(entities)
 
         return all_entities
 
-    def evaluate(self, test_data, flat_ner=False, multi_label=False, threshold=0.5, batch_size=12, entity_types=None):
+    def evaluate(
+        self,
+        test_data,
+        flat_ner=False,
+        multi_label=False,
+        threshold=0.5,
+        batch_size=12,
+        entity_types=None,
+    ):
         self.eval()
-        data_loader = self.create_dataloader(test_data, batch_size=batch_size, entity_types=entity_types, shuffle=False)
+        data_loader = self.create_dataloader(
+            test_data, batch_size=batch_size, entity_types=entity_types, shuffle=False
+        )
         device = next(self.parameters()).device
         all_preds = []
         all_trues = []
@@ -381,7 +454,11 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
             dict_load = torch.load(model_file, map_location=torch.device(map_location))
             config = dict_load["config"]
             state_dict = dict_load["model_weights"]
-            config.model_name = "microsoft/deberta-v3-base" if filename == "gliner_base.pt" else "microsoft/mdeberta-v3-base"
+            config.model_name = (
+                "microsoft/deberta-v3-base"
+                if filename == "gliner_base.pt"
+                else "microsoft/mdeberta-v3-base"
+            )
             model = cls(config)
             model.load_state_dict(state_dict, strict=strict)
             # Required to update flair's internals as well:
@@ -459,7 +536,9 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
         if config is not None:
             if isinstance(config, argparse.Namespace):
                 config = vars(config)
-            (save_directory / "gliner_config.json").write_text(json.dumps(config, indent=2))
+            (save_directory / "gliner_config.json").write_text(
+                json.dumps(config, indent=2)
+            )
 
         # push to the Hub if required
         if push_to_hub:

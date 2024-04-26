@@ -1,7 +1,9 @@
+import random
 import argparse
 import os
 
 import torch
+import numpy as np
 from tqdm import tqdm
 from transformers import get_cosine_schedule_with_warmup
 
@@ -13,12 +15,23 @@ import json
 
 
 # train function
-def train(model, optimizer, train_data, num_steps=1000, eval_every=100, log_dir="logs", warmup_ratio=0.1,
-          train_batch_size=8, device='cuda'):
+def train(
+    model,
+    optimizer,
+    train_data,
+    num_steps=1000,
+    eval_every=100,
+    log_dir="logs",
+    warmup_ratio=0.1,
+    train_batch_size=8,
+    device="cuda",
+):
     model.train()
 
     # initialize data loaders
-    train_loader = model.create_dataloader(train_data, batch_size=train_batch_size, shuffle=True)
+    train_loader = model.create_dataloader(
+        train_data, batch_size=train_batch_size, shuffle=True
+    )
 
     pbar = tqdm(range(num_steps))
 
@@ -28,9 +41,7 @@ def train(model, optimizer, train_data, num_steps=1000, eval_every=100, log_dir=
         num_warmup_steps = int(warmup_ratio)
 
     scheduler = get_cosine_schedule_with_warmup(
-        optimizer,
-        num_warmup_steps=num_warmup_steps,
-        num_training_steps=num_steps
+        optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_steps
     )
 
     iter_train_loader = iter(train_loader)
@@ -63,10 +74,10 @@ def train(model, optimizer, train_data, num_steps=1000, eval_every=100, log_dir=
         description = f"step: {step} | epoch: {step // len(train_loader)} | loss: {loss.item():.2f}"
 
         if (step + 1) % eval_every == 0:
-            current_path = os.path.join(log_dir, f'model_{step + 1}')
+            current_path = os.path.join(log_dir, f"model_{step + 1}")
             model.save_pretrained(current_path)
-            #val_data_dir =  "/gpfswork/rech/ohy/upa43yu/NER_datasets" # can be obtained from "https://drive.google.com/file/d/1T-5IbocGka35I7X3CE6yKe5N_Xg2lVKT/view"
-            #get_for_all_path(model, step, log_dir, val_data_dir)  # you can remove this comment if you want to evaluate the model
+            # val_data_dir =  "/gpfswork/rech/ohy/upa43yu/NER_datasets" # can be obtained from "https://drive.google.com/file/d/1T-5IbocGka35I7X3CE6yKe5N_Xg2lVKT/view"
+            # get_for_all_path(model, step, log_dir, val_data_dir)  # you can remove this comment if you want to evaluate the model
 
             model.train()
 
@@ -75,50 +86,79 @@ def train(model, optimizer, train_data, num_steps=1000, eval_every=100, log_dir=
 
 def create_parser():
     parser = argparse.ArgumentParser(description="Span-based NER")
-    parser.add_argument("--config", type=str, default="config.yaml", help="Path to config file")
-    parser.add_argument('--log_dir', type=str, default='logs', help='Path to the log directory')
+    parser.add_argument(
+        "--config", type=str, default="config_large.yaml", help="Path to config file"
+    )
+    parser.add_argument("--train_dataset", type=str)
     return parser
 
 
 if __name__ == "__main__":
-    # parse args
-    parser = create_parser()
-    args = parser.parse_args()
+    log_dir = "/vol/tmp/goldejon/gliner/logs/{model}/{dataset}/{seed}"
+    train_data_dir = "/vol/tmp/goldejon/gliner/train_datasets/{dataset}.json"
 
-    # load config
-    config = load_config_as_namespace(args.config)
+    for seed in [123, 234, 345]:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
-    config.log_dir = args.log_dir
+        # parse args
+        parser = create_parser()
+        args = parser.parse_args()
 
-    try:
-        with open(config.train_data, 'r') as f:
-            data = json.load(f)
-    except:
-        data = sample_train_data(config.train_data, 10000)
+        # load config
+        config = load_config_as_namespace(args.config)
 
-    if config.prev_path != "none":
-        model = GLiNER.from_pretrained(config.prev_path)
-        model.config = config
-    else:
-        model = GLiNER(config)
+        try:
+            train_dataset_path = train_data_dir.format(dataset=args.train_dataset)
+            with open(train_dataset_path, "r") as f:
+                data = json.load(f)
+        except:
+            raise ValueError("Invalid data path")
 
-    if torch.cuda.is_available():
-        model = model.to('cuda')
+        model_name = config.model_name.split("/")[-1]
+        run_dir = log_dir.format(
+            model=model_name, dataset=args.train_dataset, seed=seed
+        )
+        if not os.path.exists(run_dir):
+            os.makedirs(run_dir)
+        else:
+            raise ValueError("Log directory already exists")
 
-    lr_encoder = float(config.lr_encoder)
-    lr_others = float(config.lr_others)
+        if config.prev_path != "none":
+            model = GLiNER.from_pretrained(config.prev_path)
+            model.config = config
+        else:
+            model = GLiNER(config)
 
-    optimizer = torch.optim.AdamW([
-        # encoder
-        {'params': model.token_rep_layer.parameters(), 'lr': lr_encoder},
-        {'params': model.rnn.parameters(), 'lr': lr_others},
-        # projection layers
-        {'params': model.span_rep_layer.parameters(), 'lr': lr_others},
-        {'params': model.prompt_rep_layer.parameters(), 'lr': lr_others},
-    ])
+        if torch.cuda.is_available():
+            model = model.to("cuda")
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        lr_encoder = float(config.lr_encoder)
+        lr_others = float(config.lr_others)
 
-    train(model, optimizer, data, num_steps=config.num_steps, eval_every=config.eval_every,
-          log_dir=config.log_dir, warmup_ratio=config.warmup_ratio, train_batch_size=config.train_batch_size,
-          device=device)
+        optimizer = torch.optim.AdamW(
+            [
+                # encoder
+                {"params": model.token_rep_layer.parameters(), "lr": lr_encoder},
+                {"params": model.rnn.parameters(), "lr": lr_others},
+                # projection layers
+                {"params": model.span_rep_layer.parameters(), "lr": lr_others},
+                {"params": model.prompt_rep_layer.parameters(), "lr": lr_others},
+            ]
+        )
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        train(
+            model,
+            optimizer,
+            data,
+            num_steps=config.num_steps,
+            eval_every=config.eval_every,
+            log_dir=run_dir,
+            warmup_ratio=config.warmup_ratio,
+            train_batch_size=config.train_batch_size,
+            device=device,
+        )
