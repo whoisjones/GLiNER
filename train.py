@@ -119,6 +119,11 @@ if __name__ == "__main__":
                 train_dataset_path = train_data_dir.format(dataset=args.train_dataset)
                 with open(train_dataset_path, "r") as f:
                     data = json.load(f)
+
+                if len(data) > config.train_batch_size * config.num_steps:
+                    data = random.sample(
+                        data, config.train_batch_size * config.num_steps
+                    )
         except:
             raise ValueError("Invalid data path")
 
