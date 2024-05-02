@@ -413,8 +413,8 @@ class GLiNER(InstructBase, PyTorchModelHubMixin):
             all_preds.extend(batch_predictions)
             all_trues.extend(x["entities"])
         evaluator = Evaluator(all_trues, all_preds)
-        out, f1 = evaluator.evaluate()
-        return out, f1
+        metrics = evaluator.evaluate()
+        return metrics
 
     @classmethod
     def _from_pretrained(

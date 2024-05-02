@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 import torch
 from seqeval.metrics.v1 import _prf_divide
 
@@ -26,6 +27,11 @@ def extract_tp_actual_correct(y_true, y_pred):
         pred_sum = np.append(pred_sum, len(entities_pred_type))
         true_sum = np.append(true_sum, len(entities_true_type))
 
+    tp_sum = np.append(tp_sum, tp_sum.sum())
+    pred_sum = np.append(pred_sum, pred_sum.sum())
+    true_sum = np.append(true_sum, true_sum.sum())
+    target_names.append("average")
+
     return pred_sum, tp_sum, true_sum, target_names
 
 
@@ -40,41 +46,36 @@ def flatten_for_eval(y_true, y_pred):
     return all_true, all_pred
 
 
-def compute_prf(y_true, y_pred, average='micro'):
-    y_true, y_pred = flatten_for_eval(y_true, y_pred)
-
-    pred_sum, tp_sum, true_sum, target_names = extract_tp_actual_correct(y_true, y_pred)
-
-    if average == 'micro':
-        tp_sum = np.array([tp_sum.sum()])
-        pred_sum = np.array([pred_sum.sum()])
-        true_sum = np.array([true_sum.sum()])
+def compute_prf(tp_sum, true_sum, pred_sum, average="micro"):
+    tp_sum = np.array([tp_sum])
+    true_sum = np.array([true_sum])
+    pred_sum = np.array([pred_sum])
 
     precision = _prf_divide(
         numerator=tp_sum,
         denominator=pred_sum,
-        metric='precision',
-        modifier='predicted',
+        metric="precision",
+        modifier="predicted",
         average=average,
-        warn_for=('precision', 'recall', 'f-score'),
-        zero_division='warn'
+        warn_for=("precision", "recall", "f-score"),
+        zero_division="warn",
     )
 
     recall = _prf_divide(
         numerator=tp_sum,
         denominator=true_sum,
-        metric='recall',
-        modifier='true',
+        metric="recall",
+        modifier="true",
         average=average,
-        warn_for=('precision', 'recall', 'f-score'),
-        zero_division='warn'
+        warn_for=("precision", "recall", "f-score"),
+        zero_division="warn",
     )
 
     denominator = precision + recall
-    denominator[denominator == 0.] = 1
+    denominator[denominator == 0] = 1
     f_score = 2 * (precision * recall) / denominator
 
-    return {'precision': precision[0], 'recall': recall[0], 'f_score': f_score[0]}
+    return {"precision": precision[0], "recall": recall[0], "f_score": f_score[0]}
 
 
 class Evaluator:
@@ -106,15 +107,28 @@ class Evaluator:
 
     @torch.no_grad()
     def evaluate(self):
-        all_true_typed, all_outs_typed = self.transform_data()
-        precision, recall, f1 = compute_prf(all_true_typed, all_outs_typed).values()
-        output_str = f"P: {precision:.2%}\tR: {recall:.2%}\tF1: {f1:.2%}\n"
-        return output_str, f1
+        y_true, y_pred = self.transform_data()
+        y_true, y_pred = flatten_for_eval(y_true, y_pred)
+        pred_sum, tp_sum, true_sum, target_names = extract_tp_actual_correct(
+            y_true, y_pred
+        )
+
+        results = pd.DataFrame()
+        for i in range(len(target_names)):
+            metrics = compute_prf(
+                tp_sum=tp_sum[i], true_sum=true_sum[i], pred_sum=pred_sum[i]
+            )
+            metrics["entity"] = target_names[i]
+            metrics = pd.DataFrame([metrics])
+            results = pd.concat([results, metrics], ignore_index=True)
+        return results
 
 
 def is_nested(idx1, idx2):
     # Return True if idx2 is nested inside idx1 or vice versa
-    return (idx1[0] <= idx2[0] and idx1[1] >= idx2[1]) or (idx2[0] <= idx1[0] and idx2[1] >= idx1[1])
+    return (idx1[0] <= idx2[0] and idx1[1] >= idx2[1]) or (
+        idx2[0] <= idx1[0] and idx2[1] >= idx1[1]
+    )
 
 
 def has_overlapping(idx1, idx2, multi_label=False):
