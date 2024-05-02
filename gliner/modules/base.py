@@ -1,6 +1,7 @@
 import random
 import warnings
 from collections import defaultdict
+from typing import List, Dict
 
 import torch
 from torch import nn
@@ -30,7 +31,9 @@ class InstructBase(nn.Module):
 
         if len(tokens) > max_len:
             # add warning to say that sentence has been truncated
-            warnings.warn(f"Sentence of length {len(tokens)} has been truncated to {max_len}")
+            warnings.warn(
+                f"Sentence of length {len(tokens)} has been truncated to {max_len}"
+            )
             length = max_len
             tokens = tokens[:max_len]
         else:
@@ -83,7 +86,7 @@ class InstructBase(nn.Module):
                     # no negatives
                     negs_i = []
                 else:
-                    negs_i = negs[:len(b["ner"]) * neg_type_ratio]
+                    negs_i = negs[: len(b["ner"]) * neg_type_ratio]
 
                 # this is the list of all possible entity types (positive and negative)
                 types = list(set([el[-1] for el in b["ner"]] + negs_i))
@@ -99,7 +102,7 @@ class InstructBase(nn.Module):
                         types = types[:num_ents]
 
                 # maximum number of entities types
-                types = types[:int(self.base_config.max_types)]
+                types = types[: int(self.base_config.max_types)]
 
                 # supervised training
                 if "label" in b:
@@ -111,14 +114,200 @@ class InstructBase(nn.Module):
                 id_to_classes.append(id_to_class)
 
             batch = [
-                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids[i]) for i, b in enumerate(batch_list)
+                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids[i])
+                for i, b in enumerate(batch_list)
             ]
 
         else:
             class_to_ids = {k: v for v, k in enumerate(entity_types, start=1)}
             id_to_classes = {k: v for v, k in class_to_ids.items()}
             batch = [
-                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids) for b in batch_list
+                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids)
+                for b in batch_list
+            ]
+
+        span_idx = pad_sequence(
+            [b["span_idx"] for b in batch], batch_first=True, padding_value=0
+        )
+
+        span_label = pad_sequence(
+            [el["span_label"] for el in batch], batch_first=True, padding_value=-1
+        )
+
+        return {
+            "seq_length": torch.LongTensor([el["seq_length"] for el in batch]),
+            "span_idx": span_idx,
+            "tokens": [el["tokens"] for el in batch],
+            "span_mask": span_label != -1,
+            "span_label": span_label,
+            "entities": [el["entities"] for el in batch],
+            "classes_to_id": class_to_ids,
+            "id_to_classes": id_to_classes,
+        }
+
+    def collate_fn_litset(self, batch_list: List[Dict[str, List]], entity_types=None):
+        # batch_list: list of dict containing tokens, ner
+        if entity_types is None:
+            negs = self.get_litset_negatives(batch_list, 100)
+            class_to_ids = []
+            id_to_classes = []
+            for b in batch_list:
+                # negs = b["negative"]
+                random.shuffle(negs)
+
+                # negs = negs[:sampled_neg]
+                max_neg_type_ratio = int(self.base_config.max_neg_type_ratio)
+
+                if max_neg_type_ratio == 0:
+                    # no negatives
+                    neg_type_ratio = 0
+                else:
+                    neg_type_ratio = random.randint(0, max_neg_type_ratio)
+
+                if neg_type_ratio == 0:
+                    # no negatives
+                    negs_i = []
+                else:
+                    negs_i = negs[: len(b["ner"]) * neg_type_ratio]
+
+                # this is the list of all possible entity types (positive and negative)
+                pos_i = []
+                for i, el in enumerate(b["ner"]):
+                    label_type = random.choice(["description", "labels"])
+                    fallback_type = (
+                        "description" if label_type == "labels" else "labels"
+                    )
+                    litset_annotation = el[-1]
+                    if litset_annotation[label_type]:
+                        pos_i.append(random.choice(litset_annotation[label_type]))
+                    elif litset_annotation[fallback_type]:
+                        pos_i.append(random.choice(litset_annotation[fallback_type]))
+                    else:
+                        pos_i.append("miscellaneous")
+                    b["ner"][i] = [el[0], el[1], pos_i[-1]]
+
+                types = list(set(pos_i + negs_i))
+
+                # shuffle (every epoch)
+                random.shuffle(types)
+
+                if len(types) != 0:
+                    # prob of higher number shoul
+                    # random drop
+                    if self.base_config.random_drop:
+                        num_ents = random.randint(1, len(types))
+                        types = types[:num_ents]
+
+                # maximum number of entities types
+                types = types[: int(self.base_config.max_types)]
+
+                # supervised training
+                if "label" in b:
+                    types = sorted(b["label"])
+
+                class_to_id = {k: v for v, k in enumerate(types, start=1)}
+                id_to_class = {k: v for v, k in class_to_id.items()}
+                class_to_ids.append(class_to_id)
+                id_to_classes.append(id_to_class)
+
+            batch = [
+                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids[i])
+                for i, b in enumerate(batch_list)
+            ]
+
+        else:
+            class_to_ids = {k: v for v, k in enumerate(entity_types, start=1)}
+            id_to_classes = {k: v for v, k in class_to_ids.items()}
+            batch = [
+                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids)
+                for b in batch_list
+            ]
+
+        span_idx = pad_sequence(
+            [b["span_idx"] for b in batch], batch_first=True, padding_value=0
+        )
+
+        span_label = pad_sequence(
+            [el["span_label"] for el in batch], batch_first=True, padding_value=-1
+        )
+
+        return {
+            "seq_length": torch.LongTensor([el["seq_length"] for el in batch]),
+            "span_idx": span_idx,
+            "tokens": [el["tokens"] for el in batch],
+            "span_mask": span_label != -1,
+            "span_label": span_label,
+            "entities": [el["entities"] for el in batch],
+            "classes_to_id": class_to_ids,
+            "id_to_classes": id_to_classes,
+        }
+
+    def collate_fn_neretrieve(self, batch_list, entity_types=None):
+        # batch_list: list of dict containing tokens, ner
+        if entity_types is None:
+            negs = self.get_neretrieve_negatives(batch_list, 100)
+            class_to_ids = []
+            id_to_classes = []
+            for b in batch_list:
+                # negs = b["negative"]
+                random.shuffle(negs)
+
+                # negs = negs[:sampled_neg]
+                max_neg_type_ratio = int(self.base_config.max_neg_type_ratio)
+
+                if max_neg_type_ratio == 0:
+                    # no negatives
+                    neg_type_ratio = 0
+                else:
+                    neg_type_ratio = random.randint(0, max_neg_type_ratio)
+
+                if neg_type_ratio == 0:
+                    # no negatives
+                    negs_i = []
+                else:
+                    negs_i = negs[: len(b["ner"]) * neg_type_ratio]
+
+                # this is the list of all possible entity types (positive and negative)
+                pos_i = []
+                for i, el in enumerate(b["ner"]):
+                    pos_i.append(random.choice(el[-1]))
+                    b["ner"][i] = [el[0], el[1], pos_i[-1]]
+
+                types = list(set(pos_i + negs_i))
+
+                # shuffle (every epoch)
+                random.shuffle(types)
+
+                if len(types) != 0:
+                    # prob of higher number shoul
+                    # random drop
+                    if self.base_config.random_drop:
+                        num_ents = random.randint(1, len(types))
+                        types = types[:num_ents]
+
+                # maximum number of entities types
+                types = types[: int(self.base_config.max_types)]
+
+                # supervised training
+                if "label" in b:
+                    types = sorted(b["label"])
+
+                class_to_id = {k: v for v, k in enumerate(types, start=1)}
+                id_to_class = {k: v for v, k in class_to_id.items()}
+                class_to_ids.append(class_to_id)
+                id_to_classes.append(id_to_class)
+
+            batch = [
+                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids[i])
+                for i, b in enumerate(batch_list)
+            ]
+
+        else:
+            class_to_ids = {k: v for v, k in enumerate(entity_types, start=1)}
+            id_to_classes = {k: v for v, k in class_to_ids.items()}
+            batch = [
+                self.preprocess_spans(b["tokenized_text"], b["ner"], class_to_ids)
+                for b in batch_list
             ]
 
         span_idx = pad_sequence(
@@ -151,10 +340,64 @@ class InstructBase(nn.Module):
         random.shuffle(ent_types)
         return ent_types[:sampled_neg]
 
-    def create_dataloader(self, data, entity_types=None, **kwargs):
-        return DataLoader(data, collate_fn=lambda x: self.collate_fn(x, entity_types), **kwargs)
+    @staticmethod
+    def get_litset_negatives(batch_list, sampled_neg=5):
+        ent_types = []
+        for b in batch_list:
+            descriptions = set(
+                [el[-1]["description"][0] for el in b["ner"] if el[-1]["description"]]
+            )
+            labels = set(
+                [
+                    flat_labels
+                    for l in [el[-1]["labels"] for el in b["ner"]]
+                    for flat_labels in l
+                ]
+            )
+            ent_types.extend(list(descriptions))
+            ent_types.extend(list(labels))
+        ent_types = list(set(ent_types))
+        # sample negatives
+        random.shuffle(ent_types)
+        return ent_types[:sampled_neg]
 
-    def set_sampling_params(self, max_types, shuffle_types, random_drop, max_neg_type_ratio, max_len):
+    @staticmethod
+    def get_neretrieve_negatives(batch_list, sampled_neg=5):
+        ent_types = []
+        for b in batch_list:
+            types = []
+            for type in b["ner"]:
+                types.append(type[-1])
+            types = set([random.choice(el[-1]) for el in b["ner"]])
+            ent_types.extend(list(types))
+        ent_types = list(set(ent_types))
+        # sample negatives
+        random.shuffle(ent_types)
+        return ent_types[:sampled_neg]
+
+    def create_dataloader(
+        self, data, dataset_name: str = None, entity_types=None, **kwargs
+    ):
+        if dataset_name == "litset":
+            return DataLoader(
+                data,
+                collate_fn=lambda x: self.collate_fn_litset(x, entity_types),
+                **kwargs,
+            )
+        elif dataset_name == "neretrieve_train":
+            return DataLoader(
+                data,
+                collate_fn=lambda x: self.collate_fn_neretrieve(x, entity_types),
+                **kwargs,
+            )
+        else:
+            return DataLoader(
+                data, collate_fn=lambda x: self.collate_fn(x, entity_types), **kwargs
+            )
+
+    def set_sampling_params(
+        self, max_types, shuffle_types, random_drop, max_neg_type_ratio, max_len
+    ):
         """
         Sets sampling parameters on the given model.
 
