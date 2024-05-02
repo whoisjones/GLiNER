@@ -1,6 +1,7 @@
+import os
+import json
 import random
 import argparse
-import os
 
 import torch
 import numpy as np
@@ -9,9 +10,8 @@ from transformers import get_cosine_schedule_with_warmup
 
 # from model_nested import NerFilteredSemiCRF
 from gliner import GLiNER
-from gliner.modules.run_evaluation import sample_train_data
 from gliner.model import load_config_as_namespace
-import json
+from utils import load_litset
 
 
 # train function
@@ -19,6 +19,7 @@ def train(
     model,
     optimizer,
     train_data,
+    dataset_name: str,
     num_steps=1000,
     eval_every=100,
     log_dir="logs",
@@ -30,7 +31,7 @@ def train(
 
     # initialize data loaders
     train_loader = model.create_dataloader(
-        train_data, batch_size=train_batch_size, shuffle=True
+        train_data, dataset_name=dataset_name, batch_size=train_batch_size, shuffle=True
     )
 
     pbar = tqdm(range(num_steps))
@@ -72,6 +73,7 @@ def train(
         optimizer.zero_grad()  # Reset gradients
 
         description = f"step: {step} | epoch: {step // len(train_loader)} | loss: {loss.item():.2f}"
+        del loss
 
         if (step + 1) % eval_every == 0:
             current_path = os.path.join(log_dir, f"model_{step + 1}")
@@ -111,9 +113,12 @@ if __name__ == "__main__":
         config = load_config_as_namespace(args.config)
 
         try:
-            train_dataset_path = train_data_dir.format(dataset=args.train_dataset)
-            with open(train_dataset_path, "r") as f:
-                data = json.load(f)
+            if args.train_dataset == "litset":
+                data = load_litset()
+            else:
+                train_dataset_path = train_data_dir.format(dataset=args.train_dataset)
+                with open(train_dataset_path, "r") as f:
+                    data = json.load(f)
         except:
             raise ValueError("Invalid data path")
 
@@ -155,6 +160,7 @@ if __name__ == "__main__":
             model,
             optimizer,
             data,
+            dataset_name=args.train_dataset,
             num_steps=config.num_steps,
             eval_every=config.eval_every,
             log_dir=run_dir,
