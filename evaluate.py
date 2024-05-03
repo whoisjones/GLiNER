@@ -8,6 +8,7 @@ if __name__ == "__main__":
     configs = {
         "ontonotes": ["123/model_60000", "234/model_60000", "345/model_50000"],
         "fewnerd": ["123/model_60000", "234/model_60000", "345/model_60000"],
+        "neretrieve_train": ["123/model_60000", "234/model_60000", "345/model_60000"],
         "litset": ["123/model_60000", "234/model_60000", "345/model_60000"],
         "nuner_train": ["123/model_60000", "234/model_60000", "345/model_60000"],
         "pilener_train": ["123/model_60000", "234/model_60000", "345/model_60000"],
