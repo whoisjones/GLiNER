@@ -4,7 +4,7 @@ import pandas as pd
 from data import display_train, display_eval
 
 
-def main():
+def get_mean_std():
     paths = glob.glob("/vol/tmp/goldejon/gliner/eval/*/*/results.pkl")
 
     all_results = pd.DataFrame()
@@ -53,10 +53,10 @@ def main():
     mean_std = mean_std.reindex(list(display_train.values()))
     mean_std = mean_std.reset_index().rename_axis(None, axis=1)
     mean_std = mean_std[mean_std["Average"].notna()]
-
-    latex = mean_std.style.highlight_max(props="textbf:--rwrap;").hide(axis="index")
-    print(latex.to_latex(hrules=True, column_format="l|ccccccc|c"))
+    return mean_std
 
 
 if __name__ == "__main__":
-    main()
+    mean_std = get_mean_std()
+    latex = mean_std.style.highlight_max(props="textbf:--rwrap;").hide(axis="index")
+    print(latex.to_latex(hrules=True, column_format="l|ccccccc|c"))
