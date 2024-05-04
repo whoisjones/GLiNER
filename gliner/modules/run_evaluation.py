@@ -1,7 +1,7 @@
 import glob
 import json
 import os
-import os
+import copy
 
 import torch
 import pandas as pd
@@ -74,32 +74,6 @@ def create_dataset(path):
     return train_dataset, dev_dataset, test_dataset, labels
 
 
-@torch.no_grad()
-def get_for_one_path(path, model):
-    # load the dataset
-    _, _, test_dataset, entity_types = create_dataset(path)
-
-    data_name = path.split("/")[-1]  # get the name of the dataset
-
-    # check if the dataset is flat_ner
-    flat_ner = True
-    if any([i in data_name for i in ["ACE", "GENIA", "Corpus"]]):
-        flat_ner = False
-
-    # evaluate the model
-    metrics = model.evaluate(
-        test_dataset,
-        flat_ner=flat_ner,
-        threshold=0.5,
-        batch_size=12,
-        entity_types=entity_types,
-    )
-
-    metrics["eval_benchmark"] = data_name
-
-    return metrics
-
-
 def get_for_all_path(model, log_dir, data_paths):
     zero_shot_benc = [
         "mit-movie",
@@ -131,6 +105,166 @@ def get_for_all_path(model, log_dir, data_paths):
         results = pd.concat([results, metrics], ignore_index=True)
 
     results.to_pickle(save_path)
+
+
+@torch.no_grad()
+def get_for_one_path(path, model):
+    # load the dataset
+    _, _, test_dataset, entity_types = create_dataset(path)
+
+    data_name = path.split("/")[-1]  # get the name of the dataset
+
+    # check if the dataset is flat_ner
+    flat_ner = True
+    if any([i in data_name for i in ["ACE", "GENIA", "Corpus"]]):
+        flat_ner = False
+
+    # evaluate the model
+    metrics = model.evaluate(
+        test_dataset,
+        flat_ner=flat_ner,
+        threshold=0.5,
+        batch_size=12,
+        entity_types=entity_types,
+    )
+
+    metrics["eval_benchmark"] = data_name
+
+    return metrics
+
+
+def get_for_all_path_with_synonyms(model, data_paths, synonyms):
+    zero_shot_benc = [
+        "mit-movie",
+        "mit-restaurant",
+        "CrossNER_AI",
+        "CrossNER_literature",
+        "CrossNER_music",
+        "CrossNER_politics",
+        "CrossNER_science",
+    ]
+
+    all_paths = glob.glob(f"{data_paths}/*")
+    all_paths = [
+        path
+        for path in all_paths
+        if "sample_" not in path and path.split("/")[-1] in zero_shot_benc
+    ]
+
+    device = next(model.parameters()).device
+    model.to(device)
+    model.eval()
+
+    results = pd.DataFrame()
+
+    for p in tqdm(all_paths):
+        metrics = get_for_one_path_with_synonyms(p, model, synonyms)
+        results = pd.concat([results, metrics], ignore_index=True)
+
+    return results
+
+
+@torch.no_grad()
+def get_for_one_path_with_synonyms(path, model, synonyms):
+    # load the dataset
+    _, _, test_dataset, entity_types = create_dataset(path)
+
+    test_datasets_iter, entity_types_iter = inject_synonyms(
+        test_dataset, entity_types, synonyms
+    )
+
+    data_name = path.split("/")[-1]  # get the name of the dataset
+
+    # check if the dataset is flat_ner
+    flat_ner = True
+    if any([i in data_name for i in ["ACE", "GENIA", "Corpus"]]):
+        flat_ner = False
+
+    all_results = []
+    for test_dataset, entity_types in zip(test_datasets_iter, entity_types_iter):
+        # evaluate the model
+        metrics = model.evaluate(
+            test_dataset,
+            flat_ner=flat_ner,
+            threshold=0.5,
+            batch_size=12,
+            entity_types=entity_types,
+        )
+        metrics["eval_benchmark"] = data_name
+        all_results.append(metrics)
+
+    metrics = transform_synonym_metrics(all_results, synonyms)
+
+    return metrics
+
+
+def inject_synonyms(test_dataset, entity_types, synonyms):
+    entity_types_with_synonyms = []
+    test_dataset_with_synonyms = []
+    synoynms_for_replacement = list(zip(*synonyms.values()))
+    original_entity_types = [list(synonyms.keys())] * len(synoynms_for_replacement)
+    for original_types, _synonyms in zip(
+        original_entity_types, synoynms_for_replacement
+    ):
+        test_dataset_with_synonyms.append(copy.deepcopy(test_dataset))
+        entity_types_with_synonyms.append(copy.deepcopy(entity_types))
+        for original_type, synonym in zip(original_types, _synonyms):
+            if original_type in entity_types:
+                entity_idx = entity_types.index(original_type)
+                entity_types_with_synonyms[-1][entity_idx] = synonym
+                for dp_idx, data_point in enumerate(test_dataset_with_synonyms[-1]):
+                    for y_idx, entity in enumerate(data_point["ner"]):
+                        if entity[2] == original_type:
+                            test_dataset_with_synonyms[-1][dp_idx]["ner"][y_idx] = (
+                                entity[0],
+                                entity[1],
+                                synonym,
+                            )
+    entity_types_iter = entity_types_with_synonyms
+    test_dataset_iter = test_dataset_with_synonyms
+
+    return test_dataset_iter, entity_types_iter
+
+
+def transform_synonym_metrics(metrics_list, synonyms):
+    metrics = {
+        "original_label": [],
+        "synonym": [],
+        "metric": [],
+        "value": [],
+        "is_synonym": [],
+        "eval_benchmark": [],
+    }
+
+    synoynms_for_replacement = list(zip(*synonyms.values()))
+    original_entity_types = [list(synonyms.keys())] * len(synoynms_for_replacement)
+
+    for idx, (original_types, _synonyms) in enumerate(
+        zip(original_entity_types, synoynms_for_replacement)
+    ):
+        for original_type, synonym in zip(original_types, _synonyms):
+            if synonym not in metrics_list[idx]["entity"].values:
+                continue
+            for metric in ["precision", "recall", "f_score"]:
+                metrics["original_label"].append(original_type)
+                metrics["synonym"].append(synonym)
+                metrics["value"].append(
+                    metrics_list[idx][metrics_list[idx]["entity"] == synonym][
+                        metric
+                    ].values.item()
+                )
+                metrics["metric"].append(metric)
+                metrics["eval_benchmark"].append(
+                    metrics_list[idx][metrics_list[idx]["entity"] == synonym][
+                        "eval_benchmark"
+                    ].values.item()
+                )
+                metrics["is_synonym"].append(
+                    True if original_type != synonym else False
+                )
+
+    metrics = pd.DataFrame.from_dict(metrics)
+    return metrics
 
 
 def sample_train_data(data_paths, sample_size=10000):
