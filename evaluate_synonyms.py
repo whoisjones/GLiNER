@@ -45,6 +45,7 @@ if __name__ == "__main__":
                 data_paths=val_data_dir,
                 synonyms=synonyms,
             )
+            result["train_dataset"] = dataset
             results = pd.concat([results, result], ignore_index=True)
 
     results.to_pickle(f"{output_dir}/results.pkl")
