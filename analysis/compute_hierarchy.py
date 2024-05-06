@@ -43,11 +43,17 @@ def plot_hierarchy(scores):
         diff["top_level_entity"] = top_level_entity
         diff_df = pd.concat([diff_df, diff])
 
+    metric_display = {
+        "f_score": "F1",
+        "precision": "Precision",
+        "recall": "Recall",
+    }
+
     for metric in ["f_score", "precision", "recall"]:
         plot_df = diff_df[[metric, "top_level_entity"]].reset_index()
         plot_df.columns = [
             "FT-Dataset",
-            "Absolute Diff. Top-Level vs. Subclass Entity",
+            f"Absolute Diff. Top-Level vs. Subclass Entity ({metric_display[metric]})",
             "Std",
             "Entity",
         ]
@@ -56,7 +62,7 @@ def plot_hierarchy(scores):
         g = sns.catplot(
             data=plot_df,
             kind="bar",
-            x="Absolute Diff. Top-Level vs. Subclass Entity",
+            x=f"Absolute Diff. Top-Level vs. Subclass Entity ({metric_display[metric]})",
             y="FT-Dataset",
             row="Entity",
             hue="FT-Dataset",
@@ -66,6 +72,10 @@ def plot_hierarchy(scores):
             aspect=2.5,
             orient="h",
             legend="brief",
+        )
+        g.set_xlabels(
+            f"Absolute Diff. Top-Level vs. Subclass Entity ({metric_display[metric]})",
+            fontsize=11,
         )
 
         for ax in g.axes.flat:
