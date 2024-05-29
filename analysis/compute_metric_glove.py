@@ -1,16 +1,18 @@
 import glob
 import os
 import math
+import json
 
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
-from sentence_transformers import SentenceTransformer, util
+import torch
+from sentence_transformers import util
 
 from data import get_train_datasets_stats, display_train
 
-OUTPUT_PATH = "/vol/tmp/goldejon/gliner/eval_metric"
+OUTPUT_PATH = "/vol/tmp/goldejon/gliner/eval_metric_glove"
 
 
 def get_zeroshot_results(average=False):
@@ -35,36 +37,44 @@ def get_zeroshot_results(average=False):
 
 
 def compute_embeddings(train_dataset_stats, zeroshot_results):
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    model.to("cuda")
+    weights = torch.load("/vol/tmp/goldejon/glove/torch_embedding.pt")
+    embedding = torch.nn.Embedding.from_pretrained(weights)
+    with open("/vol/tmp/goldejon/glove/vocab.json", "r") as f:
+        vocab = json.load(f)
+    embedding.to("cuda")
 
-    zeroshot_labels = zeroshot_results["entity"].unique()
+    zeroshot_labels = zeroshot_results["entity"].unique().tolist()
+    zeroshot_labels = [label.lower().split(" ") for label in zeroshot_labels]
     train_labels_df = train_dataset_stats[["train_dataset", "train_labels_set"]]
     train_labels_normalized = train_labels_df.explode("train_labels_set")
-    train_labels = train_labels_normalized["train_labels_set"].unique().tolist()
+    train_labels = [
+        label.lower().split(" ")
+        for label in train_labels_normalized["train_labels_set"].unique().tolist()
+    ]
 
-    batch_size = 16
+    zeroshot_input_ids = [
+        [vocab.get(label, vocab.get("<unk>")) for label in labels]
+        for labels in zeroshot_labels
+    ]
+    train_input_ids = [
+        [vocab.get(label, vocab.get("<unk>")) for label in labels]
+        for labels in train_labels
+    ]
+
     zeroshot_embeddings = []
     train_label_embeddings = []
 
     if not os.path.exists(f"{OUTPUT_PATH}/zeroshot_embeddings.pkl"):
-        for i in tqdm(
-            range(0, len(zeroshot_labels), batch_size), desc="Zeroshot Embedding"
-        ):
-            emb = (
-                model.encode(
-                    zeroshot_labels[i : i + batch_size], convert_to_tensor=True
-                )
-                .detach()
-                .cpu()
-                .numpy()
-            )
+        for i in tqdm(range(0, len(zeroshot_labels)), desc="Zeroshot Embedding"):
+            input_ids = torch.LongTensor(zeroshot_input_ids[i]).to("cuda")
+            emb = embedding(input_ids).detach().cpu().numpy()
+            emb.mean(axis=0)
             zeroshot_embeddings.append(emb)
 
         embeddings = np.concatenate(zeroshot_embeddings)
         zeroshot_embedding_df = {"label": [], "embedding": []}
         for i in range(len(zeroshot_labels)):
-            zeroshot_embedding_df["label"].append(zeroshot_labels[i])
+            zeroshot_embedding_df["label"].append(" ".join(zeroshot_labels[i]))
             zeroshot_embedding_df["embedding"].append(embeddings[i])
         zeroshot_embedding_df = pd.DataFrame.from_dict(zeroshot_embedding_df)
 
@@ -80,21 +90,16 @@ def compute_embeddings(train_dataset_stats, zeroshot_results):
         output_zeroshot = pd.read_pickle(f"{OUTPUT_PATH}/zeroshot_embeddings.pkl")
 
     if not os.path.exists(f"{OUTPUT_PATH}/train_label_embeddings.pkl"):
-        for i in tqdm(
-            range(0, len(train_labels), batch_size), desc="Train Label Embedding"
-        ):
-            emb = (
-                model.encode(train_labels[i : i + batch_size], convert_to_tensor=True)
-                .detach()
-                .cpu()
-                .numpy()
-            )
+        for i in tqdm(range(0, len(train_labels)), desc="Train Label Embedding"):
+            input_ids = torch.LongTensor(train_input_ids[i]).to("cuda")
+            emb = embedding(input_ids).detach().cpu().numpy()
+            emb.mean(axis=0)
             train_label_embeddings.append(emb)
 
         embeddings = np.concatenate(train_label_embeddings)
         train_label_embedding_df = {"label": [], "embedding": []}
         for i in range(len(train_labels)):
-            train_label_embedding_df["label"].append(train_labels[i])
+            train_label_embedding_df["label"].append(" ".join(train_labels[i]))
             train_label_embedding_df["embedding"].append(embeddings[i])
         train_label_embedding_df = pd.DataFrame.from_dict(train_label_embedding_df)
 
