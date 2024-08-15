@@ -1,6 +1,6 @@
-import os
-import json
 import glob
+import json
+import os
 import random
 from collections import Counter
 
@@ -13,6 +13,7 @@ display_train = {
     "litset": "LitSet",
     "nuner_train": "NuNER",
     "pilener_train": "PileNER",
+    "asknews": "AskNews",
 }
 
 display_eval = {
@@ -26,29 +27,65 @@ display_eval = {
 }
 
 
-def get_train_datasets_stats():
-    if os.path.exists("/vol/tmp/goldejon/gliner/analysis/train_statistics.pkl"):
-        return pd.read_pickle("/vol/tmp/goldejon/gliner/analysis/train_statistics.pkl")
-
-    train_datasets = [
+def get_train_datasets_stats(
+    train_datasets: list = [
+        "neretrieve_train",
+        "litset",
+        "asknews",
+        "pilener_train",
+        "nuner_train",
         "ontonotes",
         "fewnerd",
-        "litset",
-        "nuner_train",
-        "pilener_train",
-        "neretrieve_train",
-    ]
-    train_datasets_stats = pd.DataFrame()
-    for train_dataset in train_datasets:
-        train_labels = get_train_labels(train_dataset)
-        train_labels = [label.lower() for label in train_labels]
+    ],
+    base_path: str = "/vol/tmp/goldejon/gliner",
+):
+    path = f"{base_path}/analysis/full_train_statistics.pkl"
+    if os.path.exists(path):
+        return pd.read_pickle(path)
 
+    train_datasets_stats = pd.DataFrame()
+    for dataset_name in train_datasets:
+
+        print(f"Loading in {dataset_name}.")
+        if dataset_name == "litset":
+            with open(f"{base_path}/train_datasets/litset.jsonl", "r") as f:
+                data = []
+                for line in f.readlines():
+                    data.append(json.loads(line))
+                dataset = [x for x in data if x["ner"]]
+        elif dataset_name == "asknews":
+            with open(f"{base_path}/train_datasets/asknews.json", "r") as f:
+                asknews = json.load(f)
+            with open(f"{base_path}/train_datasets/pilener_train.json", "r") as f:
+                pilener = json.load(f)
+            dataset = asknews + pilener
+        else:
+            with open(f"{base_path}/train_datasets/{dataset_name}.json", "r") as f:
+                dataset = json.load(f)
+
+        len_train_dataset = len(dataset)
+        print(f"Number of sentences in {dataset_name}: {len_train_dataset}")
+
+        print("Sampling labels.")
+        if dataset_name == "asknews":
+            labels_pilener = get_train_labels(
+                pilener, "pilener_train", base_path=base_path
+            )
+            labels_asknews = get_train_labels(
+                asknews, "asknews", base_path=base_path, required_examples=125000
+            )
+            train_labels = labels_pilener + labels_asknews
+        else:
+            train_labels = get_train_labels(dataset, dataset_name, base_path=base_path)
+
+        train_labels = [label.lower() for label in train_labels]
         train_labels_binary = set(train_labels)
         train_labels_count = Counter(train_labels)
 
         df = pd.DataFrame(
             {
-                "train_dataset": [train_dataset],
+                "train_dataset": [dataset_name],
+                "num_sentences": [len_train_dataset],
                 "train_labels_set": [train_labels_binary],
                 "train_labels_counter": [train_labels_count],
             }
@@ -58,77 +95,83 @@ def get_train_datasets_stats():
 
     train_datasets_stats.reset_index(drop=True, inplace=True)
 
-    train_datasets_stats.to_pickle(
-        "/vol/tmp/goldejon/gliner/analysis/train_statistics.pkl"
-    )
+    train_datasets_stats.to_pickle(path)
 
     return train_datasets_stats
 
 
 def get_train_labels(
-    train_dataset: str,
+    dataset,
+    dataset_name: str,
     required_examples: int = 240000,
+    base_path: str = "/vol/tmp/goldejon/gliner",
 ):
-    train_datasets_path: str = "/vol/tmp/goldejon/gliner/train_datasets"
-    if train_dataset == "litset":
-        with open("/vol/tmp/goldejon/ner4all/loner/labelID2label.json", "r") as f:
+    train_datasets_path = f"{base_path}/train_datasets"
+    if dataset_name == "litset":
+        with open(f"{train_datasets_path}/litset_labels.json", "r") as f:
             id2label = json.load(f)
         id2label.pop("0")
 
-        data = random.sample([label for label in id2label.values()], required_examples)
+        dataset = random.sample(dataset, required_examples)
 
         labels = []
-        for label in data:
-            label_type = random.choice(["description", "labels"])
-            fallback_type = "description" if label_type == "labels" else "labels"
-            if label_type in label:
-                labels.append(
-                    random.choice(label[label_type])
-                    if label_type == "labels"
-                    else label[label_type]
-                )
-            elif fallback_type in label:
-                labels.append(
-                    random.choice(label[fallback_type])
-                    if fallback_type == "labels"
-                    else label[fallback_type]
-                )
-            else:
-                labels.append("miscellaneous")
-    elif train_dataset == "neretrieve_train":
-        with open(os.path.join(train_datasets_path, f"{train_dataset}.json"), "r") as f:
-            data = json.load(f)
+        for dp in dataset:
+            for span in dp["ner"]:
+                label_type = random.choice(["description", "labels"])
+                fallback_type = "description" if label_type == "labels" else "labels"
+                annotation = span[-1]
 
-        data = random.sample(data, required_examples)
+                if not annotation[label_type]:
+                    continue
+
+                if label_type in annotation:
+                    labels.append(
+                        random.choice(annotation[label_type])
+                        if label_type == "labels"
+                        else annotation[label_type][0]
+                    )
+                elif fallback_type in annotation:
+                    labels.append(
+                        random.choice(annotation[fallback_type])
+                        if fallback_type == "labels"
+                        else annotation[fallback_type][0]
+                    )
+                else:
+                    labels.append("miscellaneous")
+
+    elif dataset_name == "neretrieve_train":
+        dataset = random.sample(dataset, required_examples)
 
         labels = []
-        for dp in data:
+        for dp in dataset:
             for entity in dp["ner"]:
                 labels.append(random.choice(entity[-1]))
 
     else:
-        with open(os.path.join(train_datasets_path, f"{train_dataset}.json"), "r") as f:
-            data = json.load(f)
 
-        repeats = required_examples // len(data)
-        remains = required_examples - (repeats * len(data))
+        repeats = required_examples // len(dataset)
+        remains = required_examples - (repeats * len(dataset))
 
         if repeats > 0:
-            data = data * repeats
+            dataset = dataset * repeats
         if remains > 0:
-            data = data + random.sample(data, remains)
+            dataset = dataset + random.sample(dataset, remains)
 
         labels = []
-        for dp in data:
+        for dp in dataset:
             for entity in dp["ner"]:
                 labels.append(entity[-1])
 
     return labels
 
 
-def get_eval_datasets_stats():
-    if os.path.exists("/vol/tmp/goldejon/gliner/analysis/eval_statistics.pkl"):
-        return pd.read_pickle("/vol/tmp/goldejon/gliner/analysis/eval_statistics.pkl")
+def get_eval_datasets_stats(
+    base_path: str = "/vol/tmp/goldejon/gliner",
+):
+    stats_path = f"{base_path}/analysis/eval_statistics.pkl"
+    eval_datasets_path = f"{base_path}/eval_datasets/NER"
+    if os.path.exists(stats_path):
+        return pd.read_pickle(stats_path)
 
     eval_datasets = [
         "mit-movie",
@@ -139,7 +182,6 @@ def get_eval_datasets_stats():
         "CrossNER_politics",
         "CrossNER_science",
     ]
-    eval_datasets_path: str = "/vol/tmp/goldejon/gliner/eval_datasets/NER"
     eval_datasets_stats = pd.DataFrame()
     for eval_dataset in eval_datasets:
         _, _, dataset, _ = create_dataset(
@@ -166,9 +208,7 @@ def get_eval_datasets_stats():
 
     eval_datasets_stats.reset_index(drop=True, inplace=True)
 
-    eval_datasets_stats.to_pickle(
-        "/vol/tmp/goldejon/gliner/analysis/eval_statistics.pkl"
-    )
+    eval_datasets_stats.to_pickle(stats_path)
 
     return eval_datasets_stats
 
@@ -213,8 +253,9 @@ def compute_overlaps(row):
     return row
 
 
-def get_eval_scores():
-    paths = glob.glob("/vol/tmp/goldejon/gliner/eval/*/*/results.pkl")
+def get_eval_scores(base_path: str = "/vol/tmp/goldejon/gliner"):
+    paths = f"{base_path}/eval/*/*/results.pkl"
+    paths = glob.glob(paths)
 
     all_results = pd.DataFrame()
     for path in paths:

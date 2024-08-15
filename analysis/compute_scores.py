@@ -1,11 +1,12 @@
 import glob
+
 import pandas as pd
 
-from data import display_train, display_eval
+from data import display_eval, display_train
 
 
-def get_mean_std():
-    paths = glob.glob("/vol/tmp/goldejon/gliner/eval/*/*/results.pkl")
+def get_mean_std(base_path: str = "/vol/tmp/goldejon/gliner"):
+    paths = glob.glob(f"{base_path}/eval/*/*/results.pkl")
 
     all_results = pd.DataFrame()
     for path in paths:
