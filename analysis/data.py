@@ -290,7 +290,7 @@ def create_raw_bin(row):
     return row
 
 
-def exposure_type_during_training(row):
+def detailed_exposure_type_during_training(row):
     exact_seen = row["exact_overlap_counter"][row["entity"]]
     exact_and_partially_seen = row["partial_overlap_counter"][row["entity"]]
     partially_seen = exact_and_partially_seen - exact_seen
@@ -302,6 +302,23 @@ def exposure_type_during_training(row):
         seen_during_training = "partial only"
     else:
         seen_during_training = "not seen"
+
+    row["exposure_type"] = seen_during_training
+
+    return row
+
+
+def exposure_type_during_training(row):
+    exact_seen = row["exact_overlap_counter"][row["entity"]]
+    exact_and_partially_seen = row["partial_overlap_counter"][row["entity"]]
+    if exact_and_partially_seen > exact_seen:
+        seen_during_training = "exact + substring matches"
+    elif exact_seen > 0:
+        seen_during_training = "exact match"
+    elif exact_and_partially_seen == 0:
+        seen_during_training = "true zero-shot"
+    else:
+        raise ValueError("This should not happen")
 
     row["exposure_type"] = seen_during_training
 
