@@ -1,16 +1,15 @@
 import glob
-import os
-import math
 import json
+import math
+import os
 
-from tqdm import tqdm
 import numpy as np
 import pandas as pd
-
 import torch
 from sentence_transformers import util
+from tqdm import tqdm
 
-from data import get_train_datasets_stats, display_train
+from data import display_train, get_train_datasets_stats
 
 OUTPUT_PATH = "/vol/tmp/goldejon/gliner/eval_metric_glove"
 
