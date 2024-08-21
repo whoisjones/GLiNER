@@ -131,7 +131,7 @@ def compute_distance(train_stats, train_embeddings, zeroshot_embeddings):
             ]
             t_emb = np.stack(dataset_embeddings["embedding"])
             sim = util.cos_sim(z_emb, t_emb)
-            top_k = sim.argsort()[0].tolist()[::-1][:100]
+            top_k = sim.argsort()[0].tolist()[::-1]
 
             closest_similarities = sim[0][top_k]
             closest_labels = dataset_embeddings.iloc[top_k]["label"].tolist()
@@ -191,7 +191,7 @@ def compute_support_top_p(row, p):
 def compute_support_top_k(row, k):
     distances = row["distances"][:k]
     occurrences = np.array(row["occurrences"])[:k]
-    if distances.size == 0:
+    if distances.nelement() == 0:
         return 0
     else:
         support = math.log10(sum(occurrences))
@@ -253,7 +253,7 @@ def compute_top_k(distances):
 def compute_top_p(distances):
     result = init_result()
 
-    for p in [0.99, 0.95, 0.9, 0.85]:
+    for p in [0.9, 0.75, 0.5]:
         dataset_distances = distances[
             ["train_dataset", "distances", "occurrences"]
         ].copy()

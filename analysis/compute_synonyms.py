@@ -1,5 +1,6 @@
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 from data import display_train
 
@@ -39,7 +40,7 @@ def plot_synonym_scores(synonym_scores: pd.DataFrame):
         inplace=True,
     )
 
-    sns.set_theme(style="whitegrid", font_scale=1)
+    sns.set_theme(style="whitegrid", font_scale=1.8)
     g = sns.catplot(
         data=plot_df,
         kind="bar",
@@ -49,8 +50,8 @@ def plot_synonym_scores(synonym_scores: pd.DataFrame):
         hue="FT-Dataset",
         order=list(display_train.values()),
         hue_order=list(display_train.values()),
-        height=1.75,
-        aspect=2.5,
+        height=3.5,
+        aspect=2.2,
         orient="h",
         legend="brief",
     )
@@ -72,6 +73,7 @@ def plot_synonym_scores(synonym_scores: pd.DataFrame):
         f"synonyms_bar.png",
         bbox_inches="tight",
     )
+    plt.clf()
 
 
 if __name__ == "__main__":

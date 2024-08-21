@@ -1,5 +1,6 @@
 import numpy as np
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 from data import (
     get_train_datasets_stats,
@@ -45,12 +46,12 @@ def plot_overlaps_percentage(overlap_information):
         inplace=True,
     )
 
-    sns.set_theme(style="whitegrid")
+    sns.set_theme(style="whitegrid", font_scale=2.0)
     g = sns.FacetGrid(
         overlaps_binary,
         col="FT-Dataset",
-        height=2.6,
-        aspect=1.7,
+        height=5,
+        aspect=1.5,
         col_wrap=3,
         col_order=list(display_train.values()),
     )
@@ -84,6 +85,7 @@ def plot_overlaps_percentage(overlap_information):
         f"overlap_between_datasets_percentage.png",
         bbox_inches="tight",
     )
+    plt.clf()
 
 
 def plot_overlaps_count(overlap_information):
@@ -125,13 +127,13 @@ def plot_overlaps_count(overlap_information):
         inplace=True,
     )
 
-    sns.set_theme(style="whitegrid")
+    sns.set_theme(style="whitegrid", font_scale=2.0)
     g = sns.FacetGrid(
         overlaps_count,
         col="FT-Dataset",
         col_order=list(display_train.values()),
-        height=2.6,
-        aspect=1.7,
+        height=5,
+        aspect=1.5,
         col_wrap=3,
     )
 
@@ -166,6 +168,7 @@ def plot_overlaps_count(overlap_information):
         f"overlap_between_datasets_count.png",
         bbox_inches="tight",
     )
+    plt.clf()
 
 
 if __name__ == "__main__":

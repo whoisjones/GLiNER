@@ -4,6 +4,7 @@ sys.path.append("/vol/fob-vol7/mi18/goldejon/GLiNER")
 
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 from evaluate_hierarchy import hierarchy
 from data import display_train
@@ -57,8 +58,10 @@ def plot_hierarchy(scores):
             "Std",
             "Entity",
         ]
+        plot_df = plot_df[plot_df["FT-Dataset"] != "NERetrieve"]
+        order = [x for x in list(display_train.values()) if x != "NERetrieve"]
 
-        sns.set_theme(style="whitegrid", font_scale=1)
+        sns.set_theme(style="whitegrid", font_scale=3.2)
         g = sns.catplot(
             data=plot_df,
             kind="bar",
@@ -66,16 +69,15 @@ def plot_hierarchy(scores):
             y="FT-Dataset",
             row="Entity",
             hue="FT-Dataset",
-            order=list(display_train.values()),
-            hue_order=list(display_train.values()),
-            height=1.75,
-            aspect=2.5,
+            order=order,
+            hue_order=order,
+            height=5,
+            aspect=3,
             orient="h",
             legend="brief",
         )
         g.set_xlabels(
-            f"Absolute Diff. Top-Level vs. Subclass Entity ({metric_display[metric]})",
-            fontsize=11,
+            f"Absolute Diff. Top-Level \n vs. Subclass Entity ({metric_display[metric]})",
         )
 
         for ax in g.axes.flat:
@@ -84,7 +86,7 @@ def plot_hierarchy(scores):
         sns.move_legend(
             g,
             "lower center",
-            bbox_to_anchor=(0.35, -0.11),
+            bbox_to_anchor=(0.35, -0.10),
             ncol=2,
             title=None,
             frameon=False,
@@ -95,6 +97,7 @@ def plot_hierarchy(scores):
             f"hierarchy_{metric}.png",
             bbox_inches="tight",
         )
+        plt.clf()
 
 
 if __name__ == "__main__":

@@ -21,37 +21,27 @@ from data import (
 
 def plot_exact_scatter(scores):
     for metric in ["precision", "recall", "f1"]:
-        sns.set_theme(style="whitegrid")
         scores["Label Seen during Pretraining"] = scores[
             "times_entity_seen_exact"
         ].apply(lambda x: "exact" if x > 0 else "not seen")
+        scores_filtered = scores[scores["times_entity_seen_exact"] > 0]
 
-        g = sns.FacetGrid(
-            scores,
+        sns.set_theme(style="darkgrid")
+        g = sns.lmplot(
+            scores_filtered,
             col="FT-Dataset",
+            x="times_entity_seen_exact",
+            y=metric,
             col_order=list(display_train.values()),
             col_wrap=3,
             height=3.5,
             aspect=1.2,
-        )
-
-        g.map_dataframe(
-            sns.scatterplot,
-            "times_entity_seen_exact",
-            metric,
-            size="# Evaluation Labels",
             hue="Label Seen during Pretraining",
-            sizes={
-                "0-50": 50,
-                "50-100": 100,
-                "100-250": 150,
-                "250-500": 200,
-                "500+": 250,
-            },
             palette="deep",
-            hue_order=["exact", "not seen"],
-            size_order=["0-50", "50-100", "100-250", "250-500", "500+"],
-            alpha=0.7,
+            hue_order=["exact"],
+            order=1,
+            logx=True,
+            scatter_kws={"s": 66, "alpha": 0.6},
         )
 
         for ax in g.axes.flat:
@@ -59,7 +49,6 @@ def plot_exact_scatter(scores):
             ax.set_xlim(-0.5)
 
         g.set_axis_labels("", f"{metric.capitalize()}")
-        g.add_legend()
         sns.move_legend(
             g, "lower center", bbox_to_anchor=(0.43, -0.13), ncol=3, frameon=False
         )
@@ -79,53 +68,75 @@ def plot_exact_scatter(scores):
 
 def plot_partial_scatter(scores):
     for metric in ["precision", "recall", "f1"]:
-        sns.set_theme(style="whitegrid")
-        g = sns.FacetGrid(
-            scores,
+        scores_filtered = scores[
+            scores["Label Seen during Pretraining"] != "not seen"
+        ].rename(
+            columns={"Label Seen during Pretraining": "Label Seen during Fine-Tuning"},
+        )
+        zeroshots = scores[scores["Label Seen during Pretraining"] == "not seen"]
+
+        sns.set_theme(style="darkgrid", font_scale=1.7)
+        g = sns.lmplot(
+            scores_filtered,
             col="FT-Dataset",
+            x="times_entity_seen_partial",
+            y=metric,
             col_order=list(display_train.values()),
             col_wrap=3,
-            height=3.5,
+            height=5,
             aspect=1.2,
-        )
-
-        g.map_dataframe(
-            sns.scatterplot,
-            "times_entity_seen_partial",
-            metric,
-            size="# Evaluation Labels",
-            hue="Label Seen during Pretraining",
-            sizes={
-                "0-50": 50,
-                "50-100": 100,
-                "100-250": 150,
-                "250-500": 200,
-                "500+": 250,
-            },
+            hue="Label Seen during Fine-Tuning",
+            markers=["x", "x", "x"],
             palette="deep",
-            hue_order=["exact + partial", "exact only", "partial only", "not seen"],
-            size_order=["0-50", "50-100", "100-250", "250-500", "500+"],
-            alpha=0.7,
+            hue_order=["exact only", "partial only", "exact + partial"],
+            order=1,
+            logx=True,
+            scatter_kws={"s": 250, "alpha": 0.2},
         )
 
-        for ax in g.axes.flat:
+        handles, labels = copy.deepcopy(g.axes.flat[-1].get_legend_handles_labels())
+
+        for ix, ax in enumerate(g.axes.flat):
+            ax.hlines(
+                y=zeroshots[[metric, "FT-Dataset"]]
+                .groupby("FT-Dataset")
+                .mean()
+                .loc[list(display_train.values())[ix]][metric],
+                xmin=0,
+                xmax=1e6,
+                color=sns.color_palette("deep")[3],
+                linestyle="--",
+                label="not seen",
+            )
             ax.set_xscale("symlog")
-            ax.set_xlim(-0.5)
+            ax.set_xlim(1)
+            ax.set_ylim(-0.05, 1)
+
+        handles.extend(
+            [Line2D([0], [0], color=sns.color_palette("deep")[3], linestyle="--")]
+        )
+        labels.extend(["not seen"])
+
+        for handle in handles:
+            handle.set_alpha(1.0)
+            handle.set_linewidth(2.0)
 
         g.set_axis_labels("", f"{metric.capitalize()}")
-        handles, labels = g.axes[-1].get_legend_handles_labels()
-        handles.insert(labels.index("# Evaluation Labels"), handles[0])
-        labels.insert(labels.index("# Evaluation Labels"), "")
-        legend_data = {label: handle for handle, label in zip(handles, labels)}
-
-        g.add_legend(legend_data)
-        sns.move_legend(
-            g, "lower center", bbox_to_anchor=(0.43, -0.13), ncol=4, frameon=False
+        g.legend.set_visible(False)
+        g.fig.legend(
+            handles=handles,
+            labels=labels,
+            loc="lower center",
+            title="How Zero-Shot Label Is Exposed During Fine-Tuning",
+            bbox_to_anchor=(0.43, -0.13),
+            ncol=4,
+            frameon=False,
         )
+
         g.fig.text(
             0.43,
             0.0,
-            "Number of Evaluation Entities seen during Pretraining",
+            "Count of Zero-Shot Label Occurring in Fine-Tuning Dataset",
             ha="center",
         )
 
@@ -134,6 +145,7 @@ def plot_partial_scatter(scores):
             f"scores_by_labels_and_overlap_partial ({metric}).png",
             bbox_inches="tight",
         )
+        plt.clf()
 
 
 def plot_old_scatter(scores):
@@ -155,7 +167,7 @@ def plot_old_scatter(scores):
         inplace=True,
     )
 
-    plot_exact_scatter(scores)
+    # plot_exact_scatter(scores)
     plot_partial_scatter(scores)
 
 
