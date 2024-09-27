@@ -1,14 +1,13 @@
 import glob
-import os
 import math
+import os
 
-from tqdm import tqdm
 import numpy as np
 import pandas as pd
-
 from sentence_transformers import SentenceTransformer, util
+from tqdm import tqdm
 
-from data import get_train_datasets_stats, display_train
+from data import display_train, get_train_datasets_stats
 
 OUTPUT_PATH = "/vol/tmp/goldejon/gliner/eval_metric"
 
@@ -39,9 +38,9 @@ def compute_embeddings(train_dataset_stats, zeroshot_results):
     model.to("cuda")
 
     zeroshot_labels = zeroshot_results["entity"].unique()
-    train_labels_df = train_dataset_stats[["train_dataset", "train_labels_set"]]
-    train_labels_normalized = train_labels_df.explode("train_labels_set")
-    train_labels = train_labels_normalized["train_labels_set"].unique().tolist()
+    train_labels_df = train_dataset_stats[["train_dataset", "train_labels_set_sampled"]]
+    train_labels_normalized = train_labels_df.explode("train_labels_set_sampled")
+    train_labels = train_labels_normalized["train_labels_set_sampled"].unique().tolist()
 
     batch_size = 16
     zeroshot_embeddings = []
@@ -101,10 +100,10 @@ def compute_embeddings(train_dataset_stats, zeroshot_results):
         output_train = pd.merge(
             train_labels_normalized,
             train_label_embedding_df,
-            left_on="train_labels_set",
+            left_on="train_labels_set_sampled",
             right_on="label",
             how="inner",
-        ).drop(columns="train_labels_set")
+        ).drop(columns="train_labels_set_sampled")
         output_train.to_pickle(f"{OUTPUT_PATH}/train_label_embeddings.pkl")
     else:
         output_train = pd.read_pickle(f"{OUTPUT_PATH}/train_label_embeddings.pkl")
@@ -136,10 +135,10 @@ def compute_distance(train_stats, train_embeddings, zeroshot_embeddings):
             closest_similarities = sim[0][top_k]
             closest_labels = dataset_embeddings.iloc[top_k]["label"].tolist()
             train_stats[train_stats["train_dataset"] == row["train_dataset"]][
-                "train_labels_counter"
+                "train_labels_counter_sampled"
             ]
             counter = train_stats[train_stats["train_dataset"] == row["train_dataset"]][
-                "train_labels_counter"
+                "train_labels_counter_sampled"
             ].iloc[0]
             occurrences = [counter[label] for label in closest_labels]
 

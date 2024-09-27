@@ -2,29 +2,29 @@ import sys
 
 sys.path.append("/vol/fob-vol7/mi18/goldejon/GLiNER")
 
-import os
-import json
-import glob
-import random
 import copy
+import glob
+import json
+import os
+import random
 from collections import Counter, defaultdict
 from typing import Dict
 
-import torch
-import pandas as pd
-import numpy as np
-from sklearn.manifold import TSNE
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-import umap
-import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import torch
+import umap
+from sklearn.manifold import TSNE
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
+from data import create_dataset
+from evaluate_gliner import configs
+from evaluate_hierarchy import filter_neretrieve, hierarchy, relabel
+from evaluate_synonyms import synonyms
 from gliner import GLiNER
 from gliner.modules.run_evaluation import inject_synonyms
-from evaluate import configs
-from evaluate_synonyms import synonyms
-from evaluate_hierarchy import hierarchy, filter_neretrieve, relabel
-from data import create_dataset
 
 
 def load_hierarchy_samples():

@@ -1,14 +1,13 @@
-import os
-import json
-import random
 import copy
+import json
+import os
+import random
 
-import torch
 import pandas as pd
+import torch
 
+from evaluate_gliner import configs
 from gliner import GLiNER
-
-from evaluate import configs
 
 hierarchy = {
     "writer": [

@@ -1,12 +1,11 @@
 import os
 
-import torch
 import pandas as pd
+import torch
 
+from evaluate_gliner import configs
 from gliner import GLiNER
 from gliner.modules.run_evaluation import get_for_all_path_with_synonyms
-
-from evaluate import configs
 
 synonyms = {
     "person": ["person", "human", "individual", "somebody", "character"],

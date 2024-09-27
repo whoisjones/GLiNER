@@ -7,17 +7,15 @@ import os
 from itertools import product
 
 import matplotlib.pyplot as plt
-import seaborn as sns
-
-from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch
-from torchmetrics.functional.pairwise import pairwise_cosine_similarity
-
 from sentence_transformers import SentenceTransformer
+from torchmetrics.functional.pairwise import pairwise_cosine_similarity
+from tqdm import tqdm
 
-from data import get_train_datasets_stats, display_train, display_eval
+from data import display_eval, display_train, get_train_datasets_stats
 from gliner import GLiNER
 
 OUTPUT_PATH = "/vol/tmp/goldejon/gliner/eval_metric_max"
@@ -70,7 +68,7 @@ def compute_gliner(train_datasets, eval_benchmarks):
             for train_dataset, model_paths in configs.items():
                 train_label_counter = train_datasets[
                     train_datasets["train_dataset"] == train_dataset
-                ]["train_labels_counter"].values[0]
+                ]["train_labels_counter_sampled"].values[0]
 
                 train_labels = list(train_label_counter.keys())
                 train_labels_count = list(train_label_counter.values())
@@ -192,7 +190,7 @@ def compute_sentence_transformers(train_datasets, eval_benchmarks):
 
                 train_label_counter = train_datasets[
                     train_datasets["train_dataset"] == train_dataset
-                ]["train_labels_counter"].values[0]
+                ]["train_labels_counter_sampled"].values[0]
 
                 train_labels = list(train_label_counter.keys())
                 train_labels_count = list(train_label_counter.values())

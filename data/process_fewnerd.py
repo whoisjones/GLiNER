@@ -1,9 +1,9 @@
 import json
-from typing import Union, Dict
-from tqdm import tqdm
+from typing import Dict, Union
 
 import datasets
 from datasets import load_dataset
+from tqdm import tqdm
 
 
 def verbalize_labels(

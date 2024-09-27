@@ -71,23 +71,44 @@ def get_train_datasets_stats(
             labels_pilener = get_train_labels(
                 pilener, "pilener_train", base_path=base_path
             )
-            labels_asknews = get_train_labels(
-                asknews, "asknews", base_path=base_path, required_examples=125000
-            )
+            labels_asknews = get_train_labels(asknews, "asknews", base_path=base_path)
             train_labels = labels_pilener + labels_asknews
         else:
             train_labels = get_train_labels(dataset, dataset_name, base_path=base_path)
 
-        train_labels = [label.lower() for label in train_labels]
-        train_labels_binary = set(train_labels)
-        train_labels_count = Counter(train_labels)
+        required_examples = 240000
+        repeats = required_examples // len(dataset)
+        remains = required_examples - (repeats * len(dataset))
+
+        if repeats == 0 and len(train_labels) > required_examples:
+            sampled_labels = random.sample(train_labels, required_examples)
+        else:
+            if repeats > 0:
+                sampled_labels = train_labels * repeats
+            if remains > 0:
+                sampled_labels = train_labels + random.sample(train_labels, remains)
+
+        train_labels = [item for sublist in train_labels for item in sublist]
+        sampled_labels = [item for sublist in sampled_labels for item in sublist]
+
+        train_labels_full_dataset = [label.lower() for label in train_labels]
+        train_labels_set_full_dataset = set(train_labels_full_dataset)
+        train_labels_counter_full_dataset = Counter(train_labels)
+
+        train_labels_sampled = [label.lower() for label in sampled_labels]
+        train_labels_set_sampled = set(train_labels_sampled)
+        train_labels_counter_sampled = Counter(train_labels_sampled)
 
         df = pd.DataFrame(
             {
                 "train_dataset": [dataset_name],
                 "num_sentences": [len_train_dataset],
-                "train_labels_set": [train_labels_binary],
-                "train_labels_counter": [train_labels_count],
+                "train_labels_set_sampled": [train_labels_set_sampled],
+                "train_labels_counter_sampled": [train_labels_counter_sampled],
+                "train_labels_set_full_dataset": [train_labels_set_full_dataset],
+                "train_labels_counter_full_dataset": [
+                    train_labels_counter_full_dataset
+                ],
             }
         )
 
@@ -103,7 +124,6 @@ def get_train_datasets_stats(
 def get_train_labels(
     dataset,
     dataset_name: str,
-    required_examples: int = 240000,
     base_path: str = "/vol/tmp/goldejon/gliner",
 ):
     train_datasets_path = f"{base_path}/train_datasets"
@@ -112,10 +132,9 @@ def get_train_labels(
             id2label = json.load(f)
         id2label.pop("0")
 
-        dataset = random.sample(dataset, required_examples)
-
         labels = []
         for dp in dataset:
+            sentence_labels = []
             for span in dp["ner"]:
                 label_type = random.choice(["description", "labels"])
                 fallback_type = "description" if label_type == "labels" else "labels"
@@ -125,42 +144,35 @@ def get_train_labels(
                     continue
 
                 if label_type in annotation:
-                    labels.append(
+                    sentence_labels.append(
                         random.choice(annotation[label_type])
                         if label_type == "labels"
                         else annotation[label_type][0]
                     )
                 elif fallback_type in annotation:
-                    labels.append(
+                    sentence_labels.append(
                         random.choice(annotation[fallback_type])
                         if fallback_type == "labels"
                         else annotation[fallback_type][0]
                     )
                 else:
-                    labels.append("miscellaneous")
+                    sentence_labels.append("miscellaneous")
 
-    elif dataset_name == "neretrieve_train":
-        dataset = random.sample(dataset, required_examples)
-
-        labels = []
-        for dp in dataset:
-            for entity in dp["ner"]:
-                labels.append(random.choice(entity[-1]))
+            labels.append(sentence_labels)
 
     else:
-
-        repeats = required_examples // len(dataset)
-        remains = required_examples - (repeats * len(dataset))
-
-        if repeats > 0:
-            dataset = dataset * repeats
-        if remains > 0:
-            dataset = dataset + random.sample(dataset, remains)
-
         labels = []
         for dp in dataset:
-            for entity in dp["ner"]:
-                labels.append(entity[-1])
+            labels.append(
+                [
+                    (
+                        random.choice(entity[-1])
+                        if dataset_name == "neretrieve_train"
+                        else entity[-1]
+                    )
+                    for entity in dp["ner"]
+                ]
+            )
 
     return labels
 
@@ -199,6 +211,7 @@ def get_eval_datasets_stats(
         df = pd.DataFrame(
             {
                 "eval_dataset": [eval_dataset],
+                "num_sentences": [len(dataset)],
                 "eval_labels_set": [eval_labels_binary],
                 "eval_labels_counter": [eval_labels_count],
             }
@@ -219,11 +232,11 @@ def compute_overlaps(row):
     exact_example_counter = Counter()
 
     exact_matches = set(
-        [tl for tl in row["train_labels_set"] if tl in row["eval_labels_set"]]
+        [tl for tl in row["train_labels_set_sampled"] if tl in row["eval_labels_set"]]
     )
     for exact_match in exact_matches:
         exact_binary_counter += 1
-        num_examples_seen_for_label = row["train_labels_counter"][exact_match]
+        num_examples_seen_for_label = row["train_labels_counter_sampled"][exact_match]
         exact_example_sum += num_examples_seen_for_label
         exact_example_counter.update({exact_match: num_examples_seen_for_label})
 
@@ -231,9 +244,9 @@ def compute_overlaps(row):
     substring_example_counter = Counter()
     substring_matches = set()
     for el in row["eval_labels_set"]:
-        for tl in row["train_labels_set"]:
+        for tl in row["train_labels_set_sampled"]:
             if el in tl:
-                num_examples_seen_for_label = row["train_labels_counter"][tl]
+                num_examples_seen_for_label = row["train_labels_counter_sampled"][tl]
                 substring_matches.add(el)
                 substring_example_sum += num_examples_seen_for_label
                 substring_example_counter.update({el: num_examples_seen_for_label})

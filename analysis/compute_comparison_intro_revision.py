@@ -23,9 +23,9 @@ if __name__ == "__main__":
     ]
     eval_statistics = get_eval_datasets_stats(base_path="/home/ec2-user/paper_data")
 
-    train_statistics["total_entities"] = train_statistics["train_labels_counter"].apply(
-        lambda c: round(sum(c.values()), 2)
-    )
+    train_statistics["total_entities"] = train_statistics[
+        "train_labels_counter_sampled"
+    ].apply(lambda c: round(sum(c.values()), 2))
 
     overlap_information = train_statistics.merge(
         eval_statistics,
