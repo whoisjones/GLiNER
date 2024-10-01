@@ -13,15 +13,15 @@ from data import (
 )
 
 if __name__ == "__main__":
-    mean_std = get_mean_std("/home/ec2-user/paper_data")
+    mean_std = get_mean_std("/vol/tmp/goldejon/gliner/paper_data")
     mean_std = mean_std[["FT-Dataset", "Average"]]
 
-    train_statistics = get_train_datasets_stats(base_path="/home/ec2-user/paper_data")
+    train_statistics = get_train_datasets_stats(base_path="/vol/tmp/goldejon/gliner")
     train_statistics = train_statistics[train_statistics["train_dataset"] != "fewnerd"]
     train_statistics = train_statistics[
         train_statistics["train_dataset"] != "ontonotes"
     ]
-    eval_statistics = get_eval_datasets_stats(base_path="/home/ec2-user/paper_data")
+    eval_statistics = get_eval_datasets_stats(base_path="/vol/tmp/goldejon/gliner")
 
     train_statistics["total_entities"] = train_statistics[
         "train_labels_counter_sampled"

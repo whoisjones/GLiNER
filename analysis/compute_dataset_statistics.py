@@ -2,7 +2,7 @@ from data import get_eval_datasets_stats, get_train_datasets_stats
 
 if __name__ == "__main__":
     train_statistics = get_train_datasets_stats(
-        base_path="/home/ec2-user/paper_data",
+        base_path="/vol/tmp/goldejon/gliner",
     )
     train_statistics["total_entities"] = train_statistics[
         "train_labels_set_full_dataset"
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     )
     print(train_statistics)
 
-    eval_statistics = get_eval_datasets_stats(base_path="/home/ec2-user/paper_data")
+    eval_statistics = get_eval_datasets_stats(base_path="/vol/tmp/goldejon/gliner")
     eval_statistics["total_entities"] = eval_statistics["eval_labels_set"].apply(
         lambda x: len(x)
     )

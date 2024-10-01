@@ -297,8 +297,8 @@ def plot_scatter(scores):
 def main():
     random.seed(42)
 
-    base_path = "/home/ec2-user/paper_data"
-    # base_path = "/vol/tmp/goldejon/gliner"
+    # base_path = "/home/ec2-user/paper_data"
+    base_path = "/vol/tmp/goldejon/gliner"
     train_statistics = get_train_datasets_stats(base_path=base_path)
     train_statistics = train_statistics[train_statistics["train_dataset"] != "fewnerd"]
     train_statistics = train_statistics[

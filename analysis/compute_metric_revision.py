@@ -197,7 +197,7 @@ def compute_weighted_average(similarities: pd.DataFrame):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--output_path", type=str, default="logs")
-    parser.add_argument("--results_dir", type=str, default="/home/ec2-user/paper_data")
+    parser.add_argument("--results_dir", type=str, default="/vol/tmp/goldejon/gliner")
     parser.add_argument("--model_paths", nargs="+", type=str)
     args = parser.parse_args()
 

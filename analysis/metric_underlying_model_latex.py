@@ -8,7 +8,7 @@ from data import display_train
 
 
 def print_latex():
-    mean_std = get_mean_std("/home/ec2-user/paper_data")
+    mean_std = get_mean_std("/vol/tmp/goldejon/gliner")
     mean_std = mean_std[mean_std["FT-Dataset"] != "OntoNotes"]
     mean_std = mean_std[mean_std["FT-Dataset"] != "FewNERD"]
     mean_std = mean_std[["FT-Dataset", "Average"]].T

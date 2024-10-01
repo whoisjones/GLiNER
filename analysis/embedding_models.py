@@ -24,7 +24,7 @@ class FastTextModel(LabelEmbeddingModel):
     def __init__(
         self,
         model_name_or_path: str,
-        data_dir: str = "/home/ec2-user/paper_data/embeddings",
+        data_dir: str = "/vol/tmp/goldejon/gliner/embeddings",
     ):
         super().__init__()
         self.unk_token = "<unk>"
@@ -87,7 +87,7 @@ class FastTextModel(LabelEmbeddingModel):
 
 class GloveModel(LabelEmbeddingModel):
     def __init__(
-        self, glove_file: str, glove_dir: str = "/home/ec2-user/paper_data/embeddings"
+        self, glove_file: str, glove_dir: str = "/vol/tmp/goldejon/gliner/embeddings"
     ):
         super().__init__()
         self.unk_token = "<unk>"
@@ -97,7 +97,7 @@ class GloveModel(LabelEmbeddingModel):
         self.embeddings = embeddings
 
     def load_glove(
-        self, glove_file: str, glove_dir: str = "/home/ec2-user/paper_data/embeddings"
+        self, glove_file: str, glove_dir: str = "/vol/tmp/goldejon/gliner/embeddings"
     ) -> Tuple[Dict[str, int], torch.nn.Embedding]:
         """
         Load GloVe model from a text file.

@@ -6,7 +6,8 @@ from gliner import GLiNER
 from gliner.modules.run_evaluation import get_for_all_path
 
 if __name__ == "__main__":
-    output_dir = f"/home/ec2-user/paper_data/eval/asknews/123"
+    #output_dir = f"/home/ec2-user/paper_data/eval/asknews/123"
+    output_dir = f"/vol/tmp/goldejon/gliner/eval/asknews/123"
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -16,7 +17,8 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         model = model.to("cuda")
 
-    val_data_dir = "/home/ec2-user/paper_data/eval_datasets/NER"
+    #val_data_dir = "/home/ec2-user/paper_data/eval_datasets/NER"
+    val_data_dir = "/vol/tmp/goldejon/gliner/eval_datasets/NER"
     get_for_all_path(
         model=model,
         log_dir=output_dir,
