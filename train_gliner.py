@@ -96,10 +96,10 @@ def create_parser():
 
 
 if __name__ == "__main__":
-    #log_dir = "/home/ec2-user/paper_data/logs/{model}/{dataset}/{seed}"
-    #train_data_dir = "/home/ec2-user/paper_data/train_datasets/{dataset}.json"
-    log_dir = '/vol/tmp/goldejon/gliner/logs/{model}/{dataset}/{seed}'
-    train_data_dir = '/vol/tmp/goldejon/gliner/train_datasets/{dataset}.json'
+    # log_dir = "/home/ec2-user/paper_data/logs/{model}/{dataset}/{seed}"
+    # train_data_dir = "/home/ec2-user/paper_data/train_datasets/{dataset}.json"
+    log_dir = "/vol/tmp/goldejon/gliner/test_cuda_error/{model}/{dataset}/{seed}"
+    train_data_dir = "/vol/tmp/goldejon/gliner/train_datasets/{dataset}.json"
 
     for seed in [123, 234, 345]:
         random.seed(seed)

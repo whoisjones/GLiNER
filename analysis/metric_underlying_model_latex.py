@@ -16,7 +16,7 @@ def print_latex():
     mean_std.columns = col_order
     mean_std.drop("FT-Dataset", inplace=True)
 
-    runs = glob.glob("logs/*")
+    runs = glob.glob("/vol/tmp/goldejon/gliner/metric_revision/*")
     model_names = {
         "Average": "\diameter~Zero-Shot F1",
         "crawl-300d-2M.vec": "fasttext-crawl-300d-2M",

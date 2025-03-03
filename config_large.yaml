@@ -3,7 +3,7 @@ lr_encoder: 1e-5
 lr_others: 5e-5
 
 # Training Parameters
-num_steps: 60000
+num_steps: 10000
 warmup_ratio: 0.1
 train_batch_size: 4
 eval_every: 10000
@@ -30,5 +30,3 @@ max_neg_type_ratio: 1
 max_len: 384
 
 name: "large"
-
-

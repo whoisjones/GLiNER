@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import numpy as np
 import pandas as pd
 import torch
-from compute_scores import get_mean_std
+from archive.compute_scores import get_mean_std
 from embedding_models import LabelEmbeddingModel, get_device, load_model
 from sentence_transformers import util
 from tqdm import tqdm
@@ -147,6 +147,7 @@ def compute_weighted_average(similarities: pd.DataFrame):
         "similarity_type": [],
         "angular_type": [],
         "k": [],
+        "eval_label": [],
     }
     close_types = [100, 250, 500, 1000, 2500, 5000, 10000]
     for k in close_types:
@@ -176,6 +177,7 @@ def compute_weighted_average(similarities: pd.DataFrame):
 
             score_df["train_dataset"].extend(3 * [row["train_dataset"]])
             score_df["eval_dataset"].extend(3 * [row["eval_dataset"]])
+            score_df["eval_label"].extend(3 * [row["eval_label"]])
             score_df["similarity_type"].append("Weighted Average")
             score_df["similarity"].append(sim_score)
             score_df["similarity_type"].append("Weighted Average (Linear Decay)")
@@ -196,7 +198,7 @@ def compute_weighted_average(similarities: pd.DataFrame):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--output_path", type=str, default="logs")
+    parser.add_argument("--output_path", type=str, default="metric_revision")
     parser.add_argument("--results_dir", type=str, default="/vol/tmp/goldejon/gliner")
     parser.add_argument("--model_paths", nargs="+", type=str)
     args = parser.parse_args()
@@ -206,8 +208,8 @@ if __name__ == "__main__":
     evaluation_statistics = evaluation_statistics[
         ["entity", "eval_dataset"]
     ].drop_duplicates()
-    evaluation_results = get_mean_std(base_path=args.results_dir)
-    evaluation_results = evaluation_results[["FT-Dataset", "Average"]]
+    evaluation_results = get_mean_std(base_path=args.results_dir, aggregated=False)
+    # evaluation_results = evaluation_results[["FT-Dataset", "Average"]]
 
     for model_path in args.model_paths:
         date = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")

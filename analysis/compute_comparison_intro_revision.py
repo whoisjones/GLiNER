@@ -3,7 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from compute_scores import get_mean_std
+from archive.compute_scores import get_mean_std
 
 from data import (
     compute_overlaps,
@@ -13,7 +13,7 @@ from data import (
 )
 
 if __name__ == "__main__":
-    mean_std = get_mean_std("/vol/tmp/goldejon/gliner/paper_data")
+    mean_std = get_mean_std("/vol/tmp/goldejon/gliner")
     mean_std = mean_std[["FT-Dataset", "Average"]]
 
     train_statistics = get_train_datasets_stats(base_path="/vol/tmp/goldejon/gliner")
@@ -56,9 +56,9 @@ if __name__ == "__main__":
     )
 
     score_label = "Avg. Zero-Shot Results"
-    dataset_label = "Fine-Tuning Datasets"
+    dataset_label = "Training Datasets"
     overlap_label = "% Overlapping Entity Types \n w/ Evaluation Datasets"
-    entity_label = "# Entity Mentions \n in Fine-Tuning Dataset"
+    entity_label = "# Entity Mentions \n in Training Dataset"
 
     overlap_information.rename(
         columns={

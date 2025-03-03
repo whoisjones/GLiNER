@@ -288,6 +288,32 @@ def get_eval_scores(base_path: str = "/vol/tmp/goldejon/gliner"):
     return all_results
 
 
+def get_eval_scores_ablation(base_path: str = "/vol/tmp/goldejon/gliner"):
+    paths = f"{base_path}/logs_ablation_new_splits/*/*/*/*/results.pkl"
+    paths = glob.glob(paths)
+
+    all_results = pd.DataFrame()
+    for path in paths:
+        result = pd.read_pickle(path)
+        metadata = path.split("/")
+        dataset = metadata[-5]
+        difficulty = metadata[-4]
+        filter_by = metadata[-3]
+        seed = metadata[-2]
+        result["train_dataset"] = dataset
+        result["difficulty"] = difficulty
+        result["filter_by"] = filter_by
+        result["seed"] = seed
+        all_results = pd.concat([all_results, result])
+
+    all_results = all_results[all_results["entity"] != "average"]
+    all_results["entity"] = all_results["entity"].str.lower()
+    all_results.rename(columns={"eval_benchmark": "eval_dataset"}, inplace=True)
+    all_results.reset_index(drop=True, inplace=True)
+
+    return all_results
+
+
 def bin_eval_labels(scores):
     scores = scores.apply(create_raw_bin, axis=1)
     bins = [0, 50, 100, 250, 500, float("inf")]

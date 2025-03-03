@@ -206,20 +206,20 @@ def plot_scatter(scores):
         ):
 
             dataset_scores = scores[scores["train_dataset"] == train_dataset]
+            dataset_scores["exposure_type"] = dataset_scores["exposure_type"].apply(
+                lambda x: x if x == "true zero-shot" else "overlap"
+            )
 
-            zeroshot_scores = dataset_scores[
+            zeroshot_score = dataset_scores[
                 dataset_scores["exposure_type"] == "true zero-shot"
-            ]
-            overlap_scores = dataset_scores[
-                dataset_scores["exposure_type"] != "true zero-shot"
-            ]
+            ][metric].mean()
             overlap_color = "mediumslateblue"
             no_overlap_color = "limegreen"
 
             g = sns.regplot(
                 x="times_entity_seen_partial",
                 y=metric,
-                data=overlap_scores,
+                data=dataset_scores[dataset_scores["exposure_type"] == "overlap"],
                 color=overlap_color,
                 ax=axes[i],
                 logx=True,
@@ -228,10 +228,10 @@ def plot_scatter(scores):
             )
 
             g.axhline(
-                zeroshot_scores[metric].mean(),
+                zeroshot_score,
                 color=no_overlap_color,
                 linestyle="--",
-                label=f"{zeroshot_scores[metric].mean():.2f}",
+                label=f"{zeroshot_score:.2f}",
             )
 
             g.set_title(f"(fine-tuned on:) {train_dataset_display}", fontsize=10)
@@ -266,31 +266,34 @@ def plot_scatter(scores):
                 markerfacecolor=overlap_color,
                 markersize=8,
             ),
-            Patch(facecolor=overlap_color, edgecolor="none", label="Overlap"),
-            Patch(
-                facecolor=no_overlap_color,
-                edgecolor="none",
+            Line2D(
+                [0],
+                [0],
+                color=overlap_color,
+                linestyle="-",
+                label="Overlap",
+            ),
+            Line2D(
+                [0],
+                [0],
+                color=no_overlap_color,
+                linestyle="--",
                 label="No overlap (true zero-shot)",
             ),
         ]
         fig.legend(
             handles,
             [
-                "Unique Evaluation Label",
-                "Overlaps w/ Fine-Tuning Labels",
-                "True Zero-Shot Transfer",
+                "Overlapping Evaluation Label ($\ell \in \mathcal{L}^{\mathcal{Z}} \cap \mathcal{L}^{\mathcal{D}}$)",
+                "Log-Regression (F1 vs. # Entity Mentions in $\mathcal{D}$)",
+                "Avg. True Zero-Shot ($\ell \in \mathcal{L}^{\mathcal{Z}} \setminus \mathcal{L}^{\mathcal{D}}$)",
             ],
             loc="lower center",
             ncols=3,
             bbox_to_anchor=(0.5, -0.075),
         )
-        fig.suptitle(
-            "Transfer Performance Linked to Prevalence and Extend of Label Overlaps between Evaluation and Fine-Tuning Datasets",
-            y=0.95,
-            fontsize=12,
-        )
         fig.tight_layout()
-        fig.savefig(f"{metric}_correlation.png", dpi=1000, bbox_inches="tight")
+        fig.savefig(f"{metric}_correlation.png", dpi=640, bbox_inches="tight")
         plt.close(fig)
 
 
